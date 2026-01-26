@@ -1,0 +1,781 @@
+"use client";
+
+import React, { useEffect, useRef, useState } from "react";
+import { supabase } from "../../lib/supabase";
+
+// ---------- helpers ----------
+
+function digitsOnly(s: string) {
+  return (s || "").replace(/\D/g, "");
+}
+function centsTextToNumber(raw: string) {
+  const d = digitsOnly(raw);
+  if (!d) return 0;
+  return parseInt(d, 10) / 100;
+}
+function formatMoneyFromRaw(raw: string) {
+  return "$" + centsTextToNumber(raw).toFixed(2);
+}
+
+function beep(freq = 880, ms = 120) {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + ms / 1000);
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + ms / 1000 + 0.02);
+    setTimeout(() => {
+      try {
+        ctx.close();
+      } catch {}
+    }, ms + 120);
+  } catch {}
+}
+function vibrate(ms = 40) {
+  try {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      // @ts-ignore
+      navigator.vibrate(ms);
+    }
+  } catch {}
+}
+
+// Auto-detect tablet id from hostname (sunstop-reg1..., reg2..., etc)
+function detectTabletId(): string {
+  if (typeof window === "undefined") return "REG1";
+  const host = window.location.hostname.toLowerCase();
+  const m = host.match(/reg\s*([1-9])/i) || host.match(/reg([1-9])/i);
+  if (m?.[1]) return `REG${m[1]}`;
+  const saved = window.localStorage.getItem("sunstop_tablet_id");
+  if (saved) return saved;
+  return "REG1";
+}
+
+// ---------- types ----------
+type SaleItem = {
+  id: string;
+  name: string;
+  upc: string;
+  price: number | null;
+  active: boolean;
+  sort_order: number;
+};
+
+function getRegFromQuery(): string | null {
+  if (typeof window === "undefined") return null;
+  const p = new URLSearchParams(window.location.search);
+  const r = (p.get("reg") || "").toUpperCase().trim();
+  if (/^REG[1-9]$/.test(r)) return r;
+  return null;
+}
+
+function BarcodeCanvas({ upc }: { upc: string }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod: any = await import("bwip-js");
+        const bwipjs = mod?.default ?? mod;
+        if (cancelled) return;
+        const canvas = ref.current;
+        if (!canvas) return;
+
+        bwipjs.toCanvas(canvas, {
+          bcid: "upca",
+          text: digitsOnly(upc).slice(0, 12),
+          scale: 3,
+          height: 10,
+          includetext: false,
+        });
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [upc]);
+
+  return (
+  <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+    <div style={{ width: "100%", maxWidth: 320 }}>
+      <canvas
+        ref={ref}
+        style={{ width: "100%", height: 90, borderRadius: 14, background: "#fff" }}
+      />
+    </div>
+  </div>
+);
+}
+
+export default function CashierPage() {
+  const [tab, setTab] = useState<0 | 1>(0);
+
+  // ✅ auto tablet id (no input box)
+ ;const [tabletId, setTabletId] = useState("REG1");
+
+useEffect(() => {
+  const fromQuery = getRegFromQuery();
+  const saved = localStorage.getItem("sunstop_tablet_id");
+
+  if (fromQuery) {
+    setTabletId(fromQuery);
+    localStorage.setItem("sunstop_tablet_id", fromQuery);
+    return;
+  }
+
+  if (saved) setTabletId(saved);
+}, []);
+
+
+  const [memberId, setMemberId] = useState("");
+  const [amountRaw, setAmountRaw] = useState("");
+  const [status, setStatus] = useState("");
+  const [scanStatus, setScanStatus] = useState("");
+
+  // keypad popup
+  const [padOpen, setPadOpen] = useState(false);
+
+  // QR scanner overlay
+  const [scanning, setScanning] = useState(false);
+  const qrRef = useRef<any>(null);
+  const readerDivId = "qr-reader"; // stable id (prevents hydration mismatch)
+
+  // Sale items
+  const [sale, setSale] = useState<SaleItem[]>([]);
+  const [saleStatus, setSaleStatus] = useState("");
+  const [saleLoading, setSaleLoading] = useState(true);
+
+  // swipe
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  // ✅ redeem popup (handshake unchanged)
+  const [redeemOpen, setRedeemOpen] = useState(false);
+  const [redeemUpc, setRedeemUpc] = useState<string | null>(null);
+  const [redeemCents, setRedeemCents] = useState<number>(0);
+  const [redeemMsg, setRedeemMsg] = useState<string>("");
+
+  // ---------- LOCKED SCREEN (no scroll / no zoom / no accidental movement) ----------
+  useEffect(() => {
+    const prevOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevTouch = (document.body.style as any).touchAction;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    // blocks pinch/zoom + scroll gestures (we still handle left/right swipe ourselves)
+    (document.body.style as any).touchAction = "none";
+
+    // block ctrl+wheel zoom (desktop)
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) e.preventDefault();
+    };
+
+    // block gesture events (some browsers)
+    const onGesture = (e: any) => {
+      e.preventDefault?.();
+      return false;
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: false } as any);
+    window.addEventListener("gesturestart", onGesture as any, { passive: false } as any);
+    window.addEventListener("gesturechange", onGesture as any, { passive: false } as any);
+    window.addEventListener("gestureend", onGesture as any, { passive: false } as any);
+
+    return () => {
+      document.documentElement.style.overflow = prevOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+      (document.body.style as any).touchAction = prevTouch;
+
+      window.removeEventListener("wheel", onWheel as any);
+      window.removeEventListener("gesturestart", onGesture as any);
+      window.removeEventListener("gesturechange", onGesture as any);
+      window.removeEventListener("gestureend", onGesture as any);
+    };
+  }, []);
+
+  // ---------- swipe left/right between tabs (blocked while overlays open) ----------
+  function onTouchStart(e: React.TouchEvent) {
+    if (scanning || padOpen || redeemOpen) return;
+    touchStartX.current = e.touches[0]?.clientX ?? null;
+    touchStartY.current = e.touches[0]?.clientY ?? null;
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    if (scanning || padOpen || redeemOpen) return;
+
+    const sx = touchStartX.current;
+    const sy = touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    if (sx == null || sy == null) return;
+
+    const ex = e.changedTouches[0]?.clientX ?? sx;
+    const ey = e.changedTouches[0]?.clientY ?? sy;
+
+    const dx = ex - sx;
+    const dy = ey - sy;
+
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      if (dx < 0) setTab(1);
+      if (dx > 0) setTab(0);
+    }
+  }
+
+  // ---------- scanner ----------
+  async function stopScanner() {
+    try {
+      const qr = qrRef.current;
+      if (qr) {
+        await qr.stop();
+        await qr.clear();
+      }
+    } catch {}
+    qrRef.current = null;
+    setScanning(false);
+  }
+
+  async function startScanner() {
+    setScanStatus("");
+    setStatus("");
+    setScanning(true);
+
+    try {
+      const mod = await import("html5-qrcode");
+      const Html5Qrcode = (mod as any).Html5Qrcode;
+
+      const qr = new Html5Qrcode(readerDivId);
+      qrRef.current = qr;
+
+      await qr.start(
+        { facingMode: "environment" },
+        { fps: 12, qrbox: { width: 260, height: 260 } },
+        async (decodedText: string) => {
+          const token = decodedText.trim();
+          setMemberId(token);
+
+          // ✅ beep/vibrate ONLY on member scan
+          beep(980, 110);
+          vibrate(30);
+
+          setScanStatus("Scanned ✅");
+
+          const { error } = await supabase.rpc("open_cashier_link", {
+            p_tablet_id: tabletId,
+            p_member_token: token,
+          });
+
+          if (error) setStatus("Link error: " + error.message);
+          else setStatus("Connected.");
+
+          stopScanner();
+        }
+      );
+    } catch (e: any) {
+      setScanStatus("Scanner error: " + (e?.message ?? String(e)));
+      setScanning(false);
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      stopScanner();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---------- heartbeat (HANDSHAKE UNCHANGED) ----------
+  useEffect(() => {
+    if (!memberId.trim()) return;
+    const t = setInterval(async () => {
+      try {
+        await supabase.rpc("heartbeat_cashier_link", { p_tablet_id: tabletId });
+      } catch {}
+    }, 5000);
+    return () => clearInterval(t);
+  }, [tabletId, memberId]);
+
+  // ---------- auto disconnect after 60 seconds ----------
+  useEffect(() => {
+    if (!memberId.trim()) return;
+
+    const started = Date.now();
+    const t = setInterval(() => {
+      if (Date.now() - started > 60_000) {
+        setMemberId("");
+        setScanStatus("");
+        setStatus("Disconnected (timeout).");
+        setAmountRaw("");
+        setPadOpen(false);
+      }
+    }, 1000);
+
+    return () => clearInterval(t);
+  }, [memberId]);
+
+  async function disconnect() {
+    setScanStatus("");
+    setStatus("Disconnected.");
+    setMemberId("");
+    setAmountRaw("");
+    setPadOpen(false);
+    try {
+      // If you have this RPC, it will mark active=false; if not, ignore.
+      await supabase.rpc("disconnect_cashier_link", { p_tablet_id: tabletId });
+    } catch {}
+  }
+
+  // ---------- purchases ----------
+  async function recordPurchase() {
+    setStatus("");
+    try {
+      if (!memberId.trim()) throw new Error("Scan member QR first.");
+      const amount = centsTextToNumber(amountRaw);
+      if (!Number.isFinite(amount) || amount <= 0)
+        throw new Error("Enter amount (ex: 1298 for $12.98).");
+
+      const { data, error } = await supabase.rpc("award_purchase", {
+        p_member_token: memberId.trim(),
+        p_amount: Number(amount.toFixed(2)),
+      });
+
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      const pts = Number(row?.points_awarded ?? 0);
+      const newPts = Number(row?.new_points ?? 0);
+
+      // ✅ optional: keep success beep for save
+      beep(1120, 120);
+      vibrate(45);
+
+      setStatus(`Saved ✅ Awarded ${pts} points. New total: ${newPts}`);
+      setAmountRaw("");
+      setPadOpen(false);
+    } catch (e: any) {
+      beep(220, 160);
+      vibrate(120);
+      setStatus("Error: " + (e?.message ?? String(e)));
+    }
+  }
+
+  // ---------- sale items ----------
+  async function loadSale() {
+    setSaleLoading(true);
+    setSaleStatus("");
+    try {
+      const { data, error } = await supabase
+        .from("sale_items")
+        .select("id,name,upc,price,active,sort_order")
+        .eq("active", true)
+        .order("sort_order", { ascending: true })
+        .limit(8);
+      if (error) throw error;
+      setSale((data as any) || []);
+    } catch (e: any) {
+      setSaleStatus("Sale load error: " + (e?.message ?? String(e)));
+    } finally {
+      setSaleLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadSale();
+    const t = setInterval(loadSale, 10_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // ---------- redeem handshake polling (UNCHANGED logic) ----------
+  useEffect(() => {
+    const t = setInterval(async () => {
+      try {
+        const { data, error } = await supabase.rpc("fulfill_latest_redemption_for_tablet", {
+          p_tablet_id: tabletId,
+        });
+        if (error) return;
+
+        const row = Array.isArray(data) ? data[0] : data;
+        if (!row?.coupon_upc) return;
+
+        setRedeemUpc(String(row.coupon_upc));
+        setRedeemCents(Number(row.cents_off ?? 0));
+        setRedeemMsg(`Coupon ready ✅ $${(Number(row.cents_off ?? 0) / 100).toFixed(2)} OFF`);
+        setRedeemOpen(true);
+
+        setTimeout(() => {
+          setRedeemOpen(false);
+          setRedeemUpc(null);
+          setRedeemCents(0);
+          setRedeemMsg("");
+        }, 60_000);
+      } catch {}
+    }, 1000);
+
+    return () => clearInterval(t);
+  }, [tabletId]);
+
+  // ---------- keypad ----------
+  function keyPress(k: string) {
+    if (k === "done") {
+      setPadOpen(false);
+      return;
+    }
+    if (k === "back") {
+      setAmountRaw((x) => x.slice(0, -1));
+      return;
+    }
+    if (k === "clear") {
+      setAmountRaw("");
+      return;
+    }
+    if (/^\d$/.test(k)) {
+      setAmountRaw((x) => (x + k).slice(0, 8)); // max 8 digits
+    }
+  }
+
+  return (
+    <div className="kioskRoot" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <style jsx global>{`
+        html, body { height: 100%; background: #f3f7ff; }
+        body { margin: 0; }
+        * { -webkit-tap-highlight-color: transparent; user-select: none; }
+        input { user-select: text; }
+
+        .kioskRoot {
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        padding: 14px;
+        box-sizing: border-box;
+        background: #f3f7ff;
+
+        /* --- screen nudge for 1340x800 tablet --- */
+        transform: translate(-70px, -105px);  /* left, up */
+        }
+
+
+        .topBar {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 5px;
+          padding: 10px 12px;
+          border-radius: 18px;
+          background: #ffffff;
+          border: 1px solid rgba(10, 60, 160, 0.10);
+        }
+
+        .brand {
+          display: flex; align-items: center; gap: 10px;
+          font-weight: 900; color: #0a2a7a; font-size: 18px;
+        }
+        .dot { width: 10px; height: 10px; border-radius: 999px; background: #1d4ed8; }
+
+        .pill {
+          padding: 6px 10px; border-radius: 999px;
+          background: rgba(29,78,216,0.12);
+          color: #1d4ed8; font-weight: 800; font-size: 12px;
+          white-space: nowrap;
+        }
+
+        .tabs { display: flex; gap: 10px; align-items: center; }
+        .tabBtn {
+          padding: 12px 14px; border-radius: 16px;
+          border: 1px solid rgba(10,60,160,0.14);
+          background: #fff; font-weight: 900; font-size: 16px;
+        }
+        .tabBtnActive { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+        .tabBtnDanger { background: #fff; border-color: rgba(220,38,38,0.25); color: #b91c1c; }
+
+        .main {
+          flex: 1; display: flex; margin-top: 12px;
+          border-radius: 22px; background: #fff;
+          border: 1px solid rgba(10, 60, 160, 0.10);
+          overflow: hidden;
+        }
+
+        .pane { flex: 1; padding: 18px; display: none; height: 100%; box-sizing: border-box; }
+        .paneActive { display: block; }
+
+        .title { font-size: 22px; font-weight: 950; color: #0a2a7a; }
+        .muted { color: rgba(10,42,122,0.65); font-weight: 700; }
+
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+        .label { font-size: 12px; font-weight: 900; color: rgba(10,42,122,0.70); margin-bottom: 6px; }
+
+        .bigInput {
+          width: 100%; padding: 18px;
+          font-size: 28px; font-weight: 900;
+          border-radius: 18px;
+          border: 1px solid rgba(10,60,160,0.18);
+          outline: none; box-sizing: border-box;
+          background: #fff;
+        }
+
+        .amountBox {
+          width: 100%;
+          padding: 18px;
+          border-radius: 18px;
+          border: 1px solid rgba(10,60,160,0.18);
+          background: #fff;
+          font-size: 28px;
+          font-weight: 950;
+          color: #0a2a7a;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .amountHint { font-size: 14px; font-weight: 800; color: rgba(10,42,122,0.55); }
+
+        .moneyPreview { font-size: 22px; font-weight: 950; color: #0a2a7a; margin-top: 8px; }
+
+        .bigBtnRow { display: flex; gap: 12px; margin-top: 14px; }
+        .bigBtn {
+          flex: 1; padding: 18px; border-radius: 18px;
+          border: 1px solid rgba(10,60,160,0.18);
+          background: #fff; font-weight: 950; font-size: 20px;
+        }
+        .bigBtnPrimary { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+
+        .statusBox {
+          margin-top: 12px; padding: 12px 14px; border-radius: 16px;
+          background: rgba(29,78,216,0.08);
+          border: 1px solid rgba(29,78,216,0.16);
+          color: #0a2a7a; font-weight: 850;
+          min-height: 44px; display: flex; align-items: center;
+        }
+
+        .overlay {
+          position: fixed; inset: 0;
+          background: rgba(10, 18, 40, 0.45);
+          display: flex; align-items: center; justify-content: center;
+          padding: 18px; z-index: 50;
+        }
+        .overlayCard {
+          width: min(680px, 96vw);
+          background: #fff; border-radius: 22px;
+          padding: 14px;
+          border: 1px solid rgba(10,60,160,0.14);
+        }
+
+        .saleGrid {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr); /* was 1fr 1fr */
+        gap: 14px;
+        }
+
+        .saleCard {
+        border-radius: 22px;
+        border: 1px solid rgba(10,60,160,0.14);
+        background: #f8fbff;
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+        min-height: 260px;           /* makes them taller */
+        align-content: start;
+        }
+
+        }
+        .saleName { font-weight: 950; font-size: 18px; color: #0a2a7a; }
+        .salePrice { font-weight: 950; font-size: 22px; color: #1d4ed8; }
+        .saleUpc { font-weight: 900; color: rgba(10,42,122,0.60); font-size: 12px; }
+
+        .keypad {
+          margin-top: 12px;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+        }
+        .key {
+          padding: 18px 0;
+          border-radius: 18px;
+          border: 1px solid rgba(10,60,160,0.16);
+          background: #fff;
+          font-weight: 950;
+          font-size: 22px;
+          color: #0a2a7a;
+        }
+        .keyAlt { background: rgba(29,78,216,0.08); }
+        .keyDone { background: #1d4ed8; color: #fff; border-color: #1d4ed8; grid-column: 1 / -1; }
+
+        @media (max-width: 900px) {
+        .grid2 { grid-template-columns: 1fr; }
+        .saleGrid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+      `}</style>
+      <div className="topBar">
+        <div className="brand">
+          <span className="dot" />
+          Cashier
+          <span className="pill">{tabletId}</span>
+          <span className="pill">{memberId ? "CONNECTED" : "NOT CONNECTED"}</span>
+        </div>
+
+        <div className="tabs">
+          <button className={"tabBtn " + (tab === 0 ? "tabBtnActive" : "")} onClick={() => setTab(0)}>
+            Member
+          </button>
+          <button className={"tabBtn " + (tab === 1 ? "tabBtnActive" : "")} onClick={() => setTab(1)}>
+            Sale
+          </button>
+          <button className="tabBtn tabBtnDanger" onClick={disconnect}>Disconnect</button>
+        </div>
+      </div>
+
+      <div className="main">
+        {/* MEMBER TAB */}
+        <div className={"pane " + (tab === 0 ? "paneActive" : "")}>
+          <div className="title">Scan Member</div>
+          <div className="muted" style={{ marginTop: 6 }}>
+            Tap amount to enter with keypad. Swipe left for Sale Items.
+          </div>
+
+          <div className="grid2">
+            {/* Receipt amount (NO system keyboard) */}
+            <div>
+              <div className="label">Receipt Amount</div>
+              <div className="amountBox" onClick={() => setPadOpen(true)}>
+                <div>
+                  <div style={{ lineHeight: 1.1 }}>
+                    {amountRaw ? amountRaw : "Tap to enter"}
+                  </div>
+                  <div className="amountHint">Type cents: 1298 = $12.98</div>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 950, color: "#1d4ed8" }}>
+                  {formatMoneyFromRaw(amountRaw)}
+                </div>
+              </div>
+              <div className="moneyPreview">{formatMoneyFromRaw(amountRaw)}</div>
+            </div>
+
+            {/* Member ID */}
+            <div>
+              <div className="label">Member ID</div>
+              <div className="bigInput" style={{ display: "flex", alignItems: "center" }}>
+                {memberId ? memberId : "Scan member QR"}
+              </div>
+            </div>
+          </div>
+
+          <div className="bigBtnRow">
+            {!scanning ? (
+              <button className="bigBtn bigBtnPrimary" onClick={startScanner}>
+                Scan Member QR
+              </button>
+            ) : (
+              <button className="bigBtn" onClick={stopScanner}>
+                Stop Camera
+              </button>
+            )}
+            <button className="bigBtn bigBtnPrimary" onClick={recordPurchase}>
+              Save Purchase
+            </button>
+          </div>
+
+          <div className="statusBox">{scanStatus || status || "Ready."}</div>
+        </div>
+
+        {/* SALE TAB */}
+        <div className={"pane " + (tab === 1 ? "paneActive" : "")}>
+          <div className="title">Sale Items (Scan from Screen)</div>
+          <div className="muted" style={{ marginTop: 6 }}>
+            Updates automatically. Swipe right to go back.
+          </div>
+
+          {saleLoading ? (
+            <div className="statusBox" style={{ marginTop: 14 }}>Loading sale items…</div>
+          ) : saleStatus ? (
+            <div className="statusBox" style={{ marginTop: 14 }}>{saleStatus}</div>
+          ) : sale.length === 0 ? (
+            <div className="statusBox" style={{ marginTop: 14 }}>No active sale items.</div>
+          ) : (
+            <div className="saleGrid">
+              {sale.slice(0, 8).map((it) => (
+                <div key={it.id} className="saleCard">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                    <div className="saleName">{it.name}</div>
+                    <div className="salePrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
+                  </div>
+                  <BarcodeCanvas upc={it.upc} />
+                  <div className="saleUpc">UPC: {digitsOnly(it.upc)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* CAMERA OVERLAY */}
+      {scanning && (
+        <div className="overlay" onClick={stopScanner}>
+          <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
+            <div className="title" style={{ fontSize: 18 }}>Scan QR</div>
+            <div className="muted" style={{ marginTop: 6 }}>Center the member QR in the box.</div>
+            <div style={{ marginTop: 12 }}>
+              <div id={readerDivId} style={{ width: "100%" }} />
+            </div>
+            <div className="bigBtnRow" style={{ marginTop: 12 }}>
+              <button className="bigBtn" onClick={stopScanner}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KEYPAD OVERLAY */}
+      {padOpen && (
+        <div className="overlay" onClick={() => setPadOpen(false)}>
+          <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
+            <div className="title" style={{ fontSize: 18 }}>Enter Amount</div>
+            <div className="muted" style={{ marginTop: 6 }}>Type cents: 1298 = $12.98</div>
+
+            <div className="moneyPreview" style={{ textAlign: "center", marginTop: 12 }}>
+              {formatMoneyFromRaw(amountRaw)}
+            </div>
+
+            <div className="keypad">
+              {"123456789".split("").map((d) => (
+                <button key={d} className="key" onClick={() => keyPress(d)}>{d}</button>
+              ))}
+              <button className="key keyAlt" onClick={() => keyPress("clear")}>Clear</button>
+              <button className="key" onClick={() => keyPress("0")}>0</button>
+              <button className="key keyAlt" onClick={() => keyPress("back")}>⌫</button>
+              <button className="key keyDone" onClick={() => keyPress("done")}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REDEEM POPUP (cashier only, handshake unchanged) */}
+      {redeemOpen && redeemUpc && (
+        <div className="overlay" onClick={() => setRedeemOpen(false)}>
+          <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
+            <div className="title">Redeem Coupon</div>
+            <div className="muted" style={{ marginTop: 6 }}>{redeemMsg}</div>
+
+            <div style={{ marginTop: 14 }}>
+              <BarcodeCanvas upc={redeemUpc} />
+              <div className="muted" style={{ marginTop: 8, fontWeight: 900 }}>
+                Scan this on the POS: ${(redeemCents / 100).toFixed(2)} OFF
+              </div>
+            </div>
+
+            <div className="bigBtnRow" style={{ marginTop: 14 }}>
+              <button className="bigBtn bigBtnPrimary" onClick={() => setRedeemOpen(false)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

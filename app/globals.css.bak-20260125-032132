@@ -1,0 +1,248 @@
+:root{
+  --bg: #f2f5f9;
+  --card: #ffffff;
+  --muted: #6b7280;
+  --text: #0f172a;
+  --blue: #2563eb;
+  --blue2:#1d4ed8;
+  --border:#e5e7eb;
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  background: radial-gradient(1200px 600px at 20% -10%, rgba(37,99,235,.18), transparent 60%),
+              radial-gradient(1200px 600px at 80% 0%, rgba(37,99,235,.10), transparent 55%),
+              var(--bg);
+  color:var(--text);
+}
+
+a{ color:inherit; text-decoration:none; }
+.container{
+  width:100%;
+  max-width:1100px;
+  margin:0 auto;
+  padding:24px;
+}
+
+.nav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:18px;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-weight:800;
+  letter-spacing:.2px;
+}
+.badge{
+  background: rgba(37,99,235,.12);
+  color: var(--blue2);
+  border:1px solid rgba(37,99,235,.25);
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+}
+
+.card{
+  background: var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow: 0 10px 30px rgba(2,6,23,.06);
+}
+
+.btn{
+  border:1px solid var(--border);
+  background:#fff;
+  padding:10px 14px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:700;
+}
+.btnPrimary{
+  background: linear-gradient(180deg, var(--blue), var(--blue2));
+  color:#fff;
+  border-color: rgba(29,78,216,.35);
+}
+.btn:disabled{ opacity:.6; cursor:not-allowed; }
+
+.input{
+  width:100%;
+  padding:12px 12px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  outline:none;
+  background:#fff;
+  font-size:16px;
+}
+.input:focus{
+  border-color: rgba(37,99,235,.45);
+  box-shadow: 0 0 0 4px rgba(37,99,235,.12);
+}
+
+.grid{
+  display:grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap:16px;
+}
+
+.dealCard{
+  grid-column: span 12;
+  overflow:hidden;
+}
+@media(min-width:720px){
+  .dealCard{ grid-column: span 6; }
+}
+@media(min-width:1024px){
+  .dealCard{ grid-column: span 4; }
+}
+
+.dealImg{
+  width:100%;
+  height:170px;
+  object-fit:cover;
+  background: #e5e7eb;
+}
+.dealBody{
+  padding:14px;
+}
+.price{
+  font-size:18px;
+  font-weight:900;
+}
+.muted{ color:var(--muted); }
+
+.modalOverlay{
+  position:fixed; inset:0;
+  background: rgba(15,23,42,.55);
+  display:flex; align-items:center; justify-content:center;
+  padding:16px;
+}
+.modal{
+  width:min(520px, 100%);
+  padding:16px;
+}
+.modalHeader{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:10px;
+}
+.hr{ height:1px; background:var(--border); margin:12px 0; }
+
+.center{
+  min-height: calc(100vh - 60px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* ===== Swipeable deal sections (Home) ===== */
+.hscroll{
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 10px 2px 4px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.hscroll::-webkit-scrollbar{ height: 0px; }
+.hscroll{ scrollbar-width: none; }
+
+.hscrollEndCap{
+  width: 2px;
+  flex: 0 0 auto;
+}
+
+.dealSwipeCard{
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+  width: min(320px, 82vw);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.75);
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+}
+
+.dealSwipeImg{
+  height: 160px;
+  background: rgba(0,0,0,0.05);
+}
+.dealSwipeImg img{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.dealSwipeImgPlaceholder{
+  width: 100%;
+  height: 100%;
+}
+
+.dealSwipeBody{
+  padding: 12px;
+}
+
+.dealSwipeTopRow{
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.dealSwipeTitle{
+  font-weight: 950;
+  font-size: 16px;
+  line-height: 1.15;
+  max-width: 220px;
+}
+
+.dealSwipePrice{
+  font-weight: 950;
+  font-size: 18px;
+}
+
+.dealSwipeDesc{
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.25;
+  min-height: 34px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.dealSwipeMeta{
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* ===== Cashier big controls ===== */
+.bigBtn{
+  font-size: 20px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  font-weight: 950;
+}
+
+.bigInput{
+  font-size: 26px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  text-align: center;
+  font-weight: 950;
+}
+
+.pricePreview{
+  font-size: 34px;
+  font-weight: 950;
+  text-align: center;
+  margin-top: 10px;
+}
