@@ -18,7 +18,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!uid) {
         if (!alive) return;
         setOk(false);
-        router.replace("/member");
+        router.replace('/admin/login');
         return;
       }
 
@@ -30,7 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       if (error || !data) {
         setOk(false);
-        router.replace("/member");
+        router.replace('/admin/login');
         return;
       }
 
