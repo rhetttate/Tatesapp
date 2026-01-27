@@ -1,108 +1,18 @@
-export const dynamic = "force-dynamic";
-
-export default function AdminHomePage() {
+export default function AdminHome() {
   return (
-    <div>
-      <div style={{ fontSize: 22, fontWeight: 950, color: "#0a2a7a" }}>
-        Overview
-      </div>
-      <div style={{ marginTop: 6, fontWeight: 800, color: "rgba(10,42,122,0.65)" }}>
-        Pick a section above.
+    <div className="card">
+      <div className="title">Admin Dashboard</div>
+      <div className="muted" style={{ marginTop: 6 }}>
+        Use the tabs above to manage deals, members, sales, redemptions, and settings.
       </div>
 
-      <div
-        style={{
-          marginTop: 16,
-          display: "grid",
-          gap: 12,
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-        }}
-      >
-        <a
-          href="/admin/deals"
-          style={{
-            textDecoration: "none",
-            background: "rgba(29,78,216,0.08)",
-            border: "1px solid rgba(29,78,216,0.16)",
-            borderRadius: 18,
-            padding: 14,
-          }}
-        >
-          <div style={{ fontWeight: 950, color: "#0a2a7a" }}>Deals</div>
-          <div style={{ marginTop: 6, fontWeight: 800, color: "rgba(10,42,122,0.65)", fontSize: 13 }}>
-            Create & manage weekly deals.
-          </div>
-        </a>
+      <div className="divider" />
 
-        <a
-          href="/admin/members"
-          style={{
-            textDecoration: "none",
-            background: "rgba(29,78,216,0.08)",
-            border: "1px solid rgba(29,78,216,0.16)",
-            borderRadius: 18,
-            padding: 14,
-          }}
-        >
-          <div style={{ fontWeight: 950, color: "#0a2a7a" }}>Members</div>
-          <div style={{ marginTop: 6, fontWeight: 800, color: "rgba(10,42,122,0.65)", fontSize: 13 }}>
-            View members, points, and activity.
-          </div>
-        </a>
-
-        <a
-          href="/admin/sales"
-          style={{
-            textDecoration: "none",
-            background: "rgba(29,78,216,0.08)",
-            border: "1px solid rgba(29,78,216,0.16)",
-            borderRadius: 18,
-            padding: 14,
-          }}
-        >
-          <div style={{ fontWeight: 950, color: "#0a2a7a" }}>Sales</div>
-          <div style={{ marginTop: 6, fontWeight: 800, color: "rgba(10,42,122,0.65)", fontSize: 13 }}>
-            Track sales entries.
-          </div>
-        </a>
-
-        <a
-          href="/admin/redemptions"
-          style={{
-            textDecoration: "none",
-            background: "rgba(29,78,216,0.08)",
-            border: "1px solid rgba(29,78,216,0.16)",
-            borderRadius: 18,
-            padding: 14,
-          }}
-        >
-          <div style={{ fontWeight: 950, color: "#0a2a7a" }}>Redemptions</div>
-          <div style={{ marginTop: 6, fontWeight: 800, color: "rgba(10,42,122,0.65)", fontSize: 13 }}>
-            Review redemptions and coupon events.
-          </div>
-        </a>
-
-        <a
-          href="/admin/settings"
-          style={{
-            textDecoration: "none",
-            background: "rgba(29,78,216,0.08)",
-            border: "1px solid rgba(29,78,216,0.16)",
-            borderRadius: 18,
-            padding: 14,
-          }}
-        >
-          <div style={{ fontWeight: 950, color: "#0a2a7a" }}>Settings</div>
-          <div style={{ marginTop: 6, fontWeight: 800, color: "rgba(10,42,122,0.65)", fontSize: 13 }}>
-            Configure app settings.
-          </div>
-        </a>
-      </div>
-
-      <div style={{ marginTop: 16, fontWeight: 800, color: "rgba(10,42,122,0.65)", fontSize: 13 }}>
-        If you still see a blank page after this, it’s almost always a crash inside one of the nested pages
-        (Deals/Members/etc) or a layout import mismatch — but this home page and layout will render on their own.
+      <div className="muted">
+        If you want, I can add a “quick stats” box here (total members, today’s sales, redemptions, etc.)
+        without breaking anything.
       </div>
     </div>
   );
 }
+
