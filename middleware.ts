@@ -21,14 +21,21 @@ function rewriteTo(prefix: string, req: NextRequest) {
 }
 
 export function middleware(req: NextRequest) {
-  const host = (req.headers.get("host") || "").toLowerCase();
+  // ✅ On Vercel the real host is often in x-forwarded-host
+  const host =
+    (req.headers.get("x-forwarded-host") ??
+      req.headers.get("host") ??
+      "")
+      .toLowerCase()
+      .split(",")[0]        // in case multiple hosts are present
+      .trim()
+      .split(":")[0];       // strip port
 
   // subdomain -> app section mapping
   if (host.startsWith("admin.")) return rewriteTo("/admin", req);
   if (host.startsWith("cashier.")) return rewriteTo("/cashier", req);
 
-  // app.tatessupermarket.com -> main public site (no rewrite)
-  // If you want app.* to go to /member instead, see note below.
+  // app.tatessupermarket.com -> member page
   if (host.startsWith("app.")) return rewriteTo("/member", req);
 
   return NextResponse.next();
@@ -37,3 +44,4 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: ["/((?!_next|favicon.ico|robots.txt|sitemap.xml).*)"],
 };
+
