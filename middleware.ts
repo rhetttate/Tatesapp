@@ -1,38 +1,49 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-function rewriteTo(prefix: string, req: NextRequest) {
+function getHost(req: NextRequest) {
+  const raw =
+    req.headers.get("x-forwarded-host") ||
+    req.headers.get("host") ||
+    req.nextUrl.host ||
+    "";
+
+  // sometimes x-forwarded-host can be "admin...., somethingelse"
+  return raw.split(",")[0].trim().toLowerCase();
+}
+
+function withDebug(res: NextResponse, host: string, pathname: string) {
+  res.headers.set("x-debug-host", host);
+  res.headers.set("x-debug-path", pathname);
+  return res;
+}
+
+function rewriteTo(prefix: string, req: NextRequest, host: string) {
   const url = req.nextUrl.clone();
 
-  // If they hit the subdomain root, send them to the section root
   if (url.pathname === "/") {
     url.pathname = prefix;
-    return NextResponse.rewrite(url);
+    return withDebug(NextResponse.rewrite(url), host, url.pathname);
   }
 
-  // If they're already in that section, do nothing
   if (url.pathname === prefix || url.pathname.startsWith(prefix + "/")) {
-    return NextResponse.next();
+    return withDebug(NextResponse.next(), host, url.pathname);
   }
 
-  // Otherwise, prefix their path (so /sale becomes /cashier/sale, etc.)
   url.pathname = prefix + url.pathname;
-  return NextResponse.rewrite(url);
+  return withDebug(NextResponse.rewrite(url), host, url.pathname);
 }
 
 export function middleware(req: NextRequest) {
-  // ✅ Vercel: the real domain is usually in x-forwarded-host
-  const host =
-    (req.headers.get("x-forwarded-host") ||
-      req.headers.get("host") ||
-      "").toLowerCase();
+  const host = getHost(req);
 
-  // subdomain -> app section mapping
-  if (host.startsWith("admin.")) return rewriteTo("/admin", req);
-  if (host.startsWith("cashier.")) return rewriteTo("/cashier", req);
-  if (host.startsWith("app.")) return rewriteTo("/member", req);
+  // IMPORTANT: match exact subdomains (not startsWith)
+  if (host === "admin.tatessupermarket.com") return rewriteTo("/admin", req, host);
+  if (host === "cashier.tatessupermarket.com") return rewriteTo("/cashier", req, host);
+  if (host === "app.tatessupermarket.com") return rewriteTo("/member", req, host);
 
-  return NextResponse.next();
+  // if someone uses other domains, do nothing
+  return withDebug(NextResponse.next(), host, req.nextUrl.pathname);
 }
 
 export const config = {
