@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { supabasePublic } from "../../../../lib/supabase_public";
+import { supabase } from "../../../../lib/supabase";
+
 
 type MemberRow = {
   id: string;
@@ -65,7 +66,7 @@ export default function AdminMemberDetail() {
     setStatus("");
 
     try {
-      const { data: m, error: mErr } = await supabasePublic
+      const { data: m, error: mErr } = await supabase
         .from("members")
         .select("id,name,email,points,created_at")
         .eq("id", id)
@@ -74,7 +75,7 @@ export default function AdminMemberDetail() {
       if (mErr) throw mErr;
       setMember(m as any);
 
-      const { data: p, error: pErr } = await supabasePublic
+      const { data: p, error: pErr } = await supabase
         .from("purchases")
         .select("id,amount,points_awarded,created_at")
         .eq("member_id", id)
@@ -84,7 +85,7 @@ export default function AdminMemberDetail() {
       if (pErr) throw pErr;
       setPurchases((p as any) || []);
 
-      const { data: r, error: rErr } = await supabasePublic
+      const { data: r, error: rErr } = await supabase
         .from("redemptions")
         .select("id,cents_off,points_redeemed,created_at")
         .eq("member_id", id)

@@ -1,67 +1,49 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-
-const LS_ADMIN_UNLOCKED = "gr_admin_unlocked";
+import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabase";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [unlocked, setUnlocked] = useState(false);
-  const [pin, setPin] = useState("");
-  const [err, setErr] = useState("");
+  const router = useRouter();
+  const [ok, setOk] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (localStorage.getItem(LS_ADMIN_UNLOCKED) === "1") {
-      setUnlocked(true);
-    }
-  }, []);
+    let alive = true;
 
-  function unlock() {
-    if (pin === (process.env.NEXT_PUBLIC_ADMIN_PIN || "1234")) {
-      localStorage.setItem(LS_ADMIN_UNLOCKED, "1");
-      setUnlocked(true);
-      setPin("");
-    } else {
-      setErr("Wrong PIN");
-    }
-  }
+    (async () => {
+      // Must be signed in
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id ?? null;
+      if (!uid) {
+        if (!alive) return;
+        setOk(false);
+        router.replace("/member");
+        return;
+      }
 
-  function lock() {
-    localStorage.removeItem(LS_ADMIN_UNLOCKED);
-    setUnlocked(false);
-  }
+      // Check admin allowlist (RLS will allow only if is_admin policy says so)
+      // Option A: select from admins
+      const { data, error } = await supabase.from("admins").select("auth_user_id").eq("auth_user_id", uid).maybeSingle();
 
-  return (
-    <div className="container">
-      <div className="nav">
-        <div className="brand">Admin</div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <Link className="btn" href="/">Home</Link>
-          {unlocked && <button className="btn" onClick={lock}>Lock</button>}
-        </div>
-      </div>
+      if (!alive) return;
 
-      {!unlocked ? (
-        <div className="center">
-          <div className="card" style={{ width: 380 }}>
-            <h3>Enter Admin PIN</h3>
-            <input className="input" value={pin} onChange={(e) => setPin(e.target.value)} />
-            <button className="btn btnPrimary" onClick={unlock}>Unlock</button>
-            {err && <p>{err}</p>}
-          </div>
-        </div>
-      ) : (
-        <>
-          <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-            <Link className="btn" href="/admin">Dashboard</Link>
-            <Link className="btn" href="/admin/members">Members</Link>
-            <Link className="btn" href="/admin/sales">Sales</Link>
-            <Link className="btn" href="/admin/deals">Deals</Link>
-            <Link className="btn" href="/admin/settings">Settings</Link>
-          </div>
-          {children}
-        </>
-      )}
-    </div>
-  );
+      if (error || !data) {
+        setOk(false);
+        router.replace("/member");
+        return;
+      }
+
+      setOk(true);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [router]);
+
+  if (ok === null) return null; // or a small "Loading..." UI
+  if (ok === false) return null;
+
+  return <>{children}</>;
 }
