@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -10,6 +11,7 @@ export default function MemberPage() {
   const [authUid, setAuthUid] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+;
 
   // signup extras (ONLY for create account popup)
   const [signupOpen, setSignupOpen] = useState(false);
