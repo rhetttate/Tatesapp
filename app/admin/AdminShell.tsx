@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
-const ADMIN_EMAIL_ALLOWLIST = ["support@tatessupermarket.com"];
+const ADMIN_EMAIL_ALLOWLIST = ["rhetttate19@icloud.com"];
 
 function startOfTodayISO() {
   const d = new Date();
@@ -158,7 +158,7 @@ function AdminLogin({
 }: {
   onDone: () => void;
 }) {
-  const [email, setEmail] = useState("support@tatessupermarket.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
