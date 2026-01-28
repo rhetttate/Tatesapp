@@ -95,7 +95,11 @@ export default function MemberPage() {
       const { data, error } = await supabase.rpc("get_cashier_link_for_member", {
         p_member_token: memberId,
       });
-      if (error) throw error;
+      if (error) {
+      console.error("get_cashier_link_for_member error:", error);
+      throw error;
+    }
+
 
       const row = Array.isArray(data) ? data[0] : data;
       const lastSeen = row?.last_seen ? new Date(row.last_seen).getTime() : 0;
