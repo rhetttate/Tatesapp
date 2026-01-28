@@ -101,6 +101,7 @@ export default function MemberPage() {
 
 
       const row = Array.isArray(data) ? data[0] : data;
+      console.log("link row from rpc:", row);
       if (!row) {
       setConnected(false);
       setConnectedTablet(null);
