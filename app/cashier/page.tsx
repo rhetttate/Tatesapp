@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 // ---------- helpers ----------
-
 function digitsOnly(s: string) {
   return (s || "").replace(/\D/g, "");
 }
@@ -397,13 +396,17 @@ useEffect(() => {
   useEffect(() => {
     const t = setInterval(async () => {
       try {
-        const { data, error } = await supabase.rpc("fulfill_latest_redemption_for_tablet", {
-          p_tablet_id: tabletId,
+        const { data, error } = await supabase.rpc("claim_next_redemption_for_tablet", {
+        p_tablet_id: tabletId,
         });
         if (error) return;
 
-        const row = Array.isArray(data) ? data[0] : data;
-        if (!row?.coupon_upc) return;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return;
+
+      // POPUP HERE:
+      openCouponPopup(row); // row.coupon_upc is your barcode value
+
 
         setRedeemUpc(String(row.coupon_upc));
         setRedeemCents(Number(row.cents_off ?? 0));
@@ -779,3 +782,7 @@ useEffect(() => {
     </div>
   );
 }
+function openCouponPopup(row: any) {
+  throw new Error("Function not implemented.");
+}
+
