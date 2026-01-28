@@ -70,7 +70,6 @@ export default function MemberPage() {
 
   // ----------------------------
   // Load phone settings (NOT polled)
-  // only on login / after save / optional on settings open
   // ----------------------------
   async function loadPhoneSettingsById(id: string) {
     const { data, error } = await supabase
@@ -87,27 +86,28 @@ export default function MemberPage() {
   }
 
   // ------------------------------------------
-  // True connection: active AND last_seen < 60s
+  // Connection: active AND last_seen < 60s
   // ------------------------------------------
   async function refreshConnection(memberId: string) {
     try {
+      // expects p_member_token UUID (string is fine as long as it's a uuid)
       const { data, error } = await supabase.rpc("get_cashier_link_for_member", {
         p_member_token: memberId,
       });
-      if (error) {
-      console.error("get_cashier_link_for_member error:", error);
-      throw error;
-    }
 
+      if (error) {
+        console.error("get_cashier_link_for_member error:", error);
+        throw error;
+      }
 
       const row = Array.isArray(data) ? data[0] : data;
-      console.log("link row from rpc:", row);
       if (!row) {
-      setConnected(false);
-      setConnectedTablet(null);
-      setLastSeenMsAgo(null);
-      return;
+        setConnected(false);
+        setConnectedTablet(null);
+        setLastSeenMsAgo(null);
+        return;
       }
+
       const lastSeen = row?.last_seen ? new Date(row.last_seen).getTime() : 0;
       const msAgo = lastSeen ? Date.now() - lastSeen : null;
 
@@ -118,6 +118,7 @@ export default function MemberPage() {
       setConnectedTablet(isConnected ? (row.tablet_id as string) : null);
       setLastSeenMsAgo(msAgo);
 
+      // Open redeem sheet when connected (only if they have points)
       if (isConnected && points > 0) setRedeemSheetOpen(true);
 
       if (!isConnected) {
@@ -146,6 +147,7 @@ export default function MemberPage() {
       setPoints(0);
       setQrUrl(null);
       qrBuiltFor.current = null;
+
       setConnected(false);
       setConnectedTablet(null);
       setLastSeenMsAgo(null);
@@ -209,7 +211,7 @@ export default function MemberPage() {
   }, []);
 
   // ----------------------------
-  // Poll: points (fast, safe)
+  // Poll: points
   // ----------------------------
   useEffect(() => {
     if (!memberUuid) return;
@@ -324,7 +326,6 @@ export default function MemberPage() {
         .update({
           phone: phone.trim() || null,
           sms_opt_in: smsOptIn,
-          // remove if you don't have updated_at
           updated_at: new Date().toISOString(),
         })
         .eq("id", memberUuid);
@@ -349,9 +350,10 @@ export default function MemberPage() {
       const em = (emailOverride ?? email).trim();
       if (!em) throw new Error("Enter your email first.");
 
-     await supabase.auth.resetPasswordForEmail(em, {
-      redirectTo: `${window.location.origin}/reset`,
-    });
+      const { error } = await supabase.auth.resetPasswordForEmail(em, {
+        redirectTo: `${window.location.origin}/reset`,
+      });
+      if (error) throw error;
 
       setResetStatus("Reset email sent ✅ Check your inbox.");
     } catch (e: any) {
@@ -362,19 +364,19 @@ export default function MemberPage() {
   }
 
   // ----------------------------
-  // Redeem handshake request (UNCHANGED)
+  // Redeem request (UPDATED to match Supabase)
+  // Uses: request_redemption_for_active_link(p_member_token uuid)
   // ----------------------------
   async function requestRedeem() {
     setRedeemStatus("");
     try {
       if (!memberUuid) throw new Error("Not signed in.");
-      if (!connectedTablet) throw new Error("Not connected to cashier tablet.");
+      if (!connected) throw new Error("Not connected to cashier tablet.");
       if (points <= 0) throw new Error("No points to redeem.");
 
       setRedeeming(true);
 
-      const { error } = await supabase.rpc("request_redemption_for_tablet", {
-        p_tablet_id: connectedTablet,
+      const { error } = await supabase.rpc("request_redemption_for_active_link", {
         p_member_token: memberUuid,
       });
       if (error) throw error;
@@ -390,7 +392,7 @@ export default function MemberPage() {
 
   const connText = useMemo(() => {
     if (!connected) return "Not connected";
-    return `Connected to ${connectedTablet} ✅`;
+    return `Connected to ${connectedTablet ?? "cashier"} ✅`;
   }, [connected, connectedTablet]);
 
   return (
@@ -432,15 +434,10 @@ export default function MemberPage() {
           background: rgba(29,78,216,0.10); color: #1d4ed8;
           font-weight: 950;
         }
-          .xBtn {
-          border: 0;
-          background: transparent;
-          color: rgba(10,42,122,0.55);
-          font-weight: 950;
-          font-size: 18px;
-          cursor: pointer;
+        .xBtn {
+          border: 0; background: transparent; color: rgba(10,42,122,0.55);
+          font-weight: 950; font-size: 18px; cursor: pointer;
         }
-
 
         /* Redeem bottom sheet */
         .sheetWrap {
@@ -477,14 +474,6 @@ export default function MemberPage() {
           cursor: pointer;
         }
         .sheetBtn:disabled { opacity: 0.55; cursor: not-allowed; }
-        .xBtn {
-          border: 0;
-          background: transparent;
-          color: rgba(10,42,122,0.55);
-          font-weight: 950;
-          font-size: 18px;
-          cursor: pointer;
-        }
 
         /* Popup overlay */
         .overlay {
@@ -812,7 +801,7 @@ export default function MemberPage() {
         </div>
       )}
 
-      {/* Redeem “pop up” sheet - only when connected */}
+      {/* Redeem bottom sheet */}
       {authUid && (
         <div className="sheetWrap">
           <div className={"sheet " + (redeemSheetOpen && connected ? "sheetOpen" : "")}>
@@ -835,7 +824,7 @@ export default function MemberPage() {
                 className="sheetBtn"
                 type="button"
                 onClick={requestRedeem}
-                disabled={!connectedTablet || points <= 0 || redeeming}
+                disabled={!connected || points <= 0 || redeeming}
               >
                 {redeeming ? "Requesting…" : `Redeem ${points} Points`}
               </button>
