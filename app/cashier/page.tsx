@@ -48,17 +48,6 @@ function vibrate(ms = 40) {
   } catch {}
 }
 
-// Auto-detect tablet id from hostname (sunstop-reg1..., reg2..., etc)
-function detectTabletId(): string {
-  if (typeof window === "undefined") return "REG1";
-  const host = window.location.hostname.toLowerCase();
-  const m = host.match(/reg\s*([1-9])/i) || host.match(/reg([1-9])/i);
-  if (m?.[1]) return `REG${m[1]}`;
-  const saved = window.localStorage.getItem("sunstop_tablet_id");
-  if (saved) return saved;
-  return "REG1";
-}
-
 // ---------- types ----------
 type SaleItem = {
   id: string;
@@ -105,36 +94,33 @@ function BarcodeCanvas({ upc }: { upc: string }) {
   }, [upc]);
 
   return (
-  <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-    <div style={{ width: "100%", maxWidth: 320 }}>
-      <canvas
-        ref={ref}
-        style={{ width: "100%", height: 90, borderRadius: 14, background: "#fff" }}
-      />
+    <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 320 }}>
+        <canvas
+          ref={ref}
+          style={{ width: "100%", height: 90, borderRadius: 14, background: "#fff" }}
+        />
+      </div>
     </div>
-  </div>
-);
+  );
 }
 
 export default function CashierPage() {
   const [tab, setTab] = useState<0 | 1>(0);
 
-  // ✅ auto tablet id (no input box)
- ;const [tabletId, setTabletId] = useState("REG1");
+  const [tabletId, setTabletId] = useState("REG1");
+  useEffect(() => {
+    const fromQuery = getRegFromQuery();
+    const saved = localStorage.getItem("sunstop_tablet_id");
 
-useEffect(() => {
-  const fromQuery = getRegFromQuery();
-  const saved = localStorage.getItem("sunstop_tablet_id");
+    if (fromQuery) {
+      setTabletId(fromQuery);
+      localStorage.setItem("sunstop_tablet_id", fromQuery);
+      return;
+    }
 
-  if (fromQuery) {
-    setTabletId(fromQuery);
-    localStorage.setItem("sunstop_tablet_id", fromQuery);
-    return;
-  }
-
-  if (saved) setTabletId(saved);
-}, []);
-
+    if (saved) setTabletId(saved);
+  }, []);
 
   const [memberId, setMemberId] = useState("");
   const [amountRaw, setAmountRaw] = useState("");
@@ -147,7 +133,7 @@ useEffect(() => {
   // QR scanner overlay
   const [scanning, setScanning] = useState(false);
   const qrRef = useRef<any>(null);
-  const readerDivId = "qr-reader"; // stable id (prevents hydration mismatch)
+  const readerDivId = "qr-reader";
 
   // Sale items
   const [sale, setSale] = useState<SaleItem[]>([]);
@@ -158,13 +144,13 @@ useEffect(() => {
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
-  // ✅ redeem popup (handshake unchanged)
+  // ✅ redeem popup
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemUpc, setRedeemUpc] = useState<string | null>(null);
   const [redeemCents, setRedeemCents] = useState<number>(0);
   const [redeemMsg, setRedeemMsg] = useState<string>("");
 
-  // ---------- LOCKED SCREEN (no scroll / no zoom / no accidental movement) ----------
+  // ---------- LOCKED SCREEN ----------
   useEffect(() => {
     const prevOverflow = document.documentElement.style.overflow;
     const prevBodyOverflow = document.body.style.overflow;
@@ -172,15 +158,12 @@ useEffect(() => {
 
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
-    // blocks pinch/zoom + scroll gestures (we still handle left/right swipe ourselves)
     (document.body.style as any).touchAction = "none";
 
-    // block ctrl+wheel zoom (desktop)
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey) e.preventDefault();
     };
 
-    // block gesture events (some browsers)
     const onGesture = (e: any) => {
       e.preventDefault?.();
       return false;
@@ -203,7 +186,7 @@ useEffect(() => {
     };
   }, []);
 
-  // ---------- swipe left/right between tabs (blocked while overlays open) ----------
+  // ---------- swipe ----------
   function onTouchStart(e: React.TouchEvent) {
     if (scanning || padOpen || redeemOpen) return;
     touchStartX.current = e.touches[0]?.clientX ?? null;
@@ -262,7 +245,6 @@ useEffect(() => {
           const token = decodedText.trim();
           setMemberId(token);
 
-          // ✅ beep/vibrate ONLY on member scan
           beep(980, 110);
           vibrate(30);
 
@@ -292,7 +274,7 @@ useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---------- heartbeat (HANDSHAKE UNCHANGED) ----------
+  // ---------- heartbeat ----------
   useEffect(() => {
     if (!memberId.trim()) return;
     const t = setInterval(async () => {
@@ -328,7 +310,6 @@ useEffect(() => {
     setAmountRaw("");
     setPadOpen(false);
     try {
-      // If you have this RPC, it will mark active=false; if not, ignore.
       await supabase.rpc("disconnect_cashier_link", { p_tablet_id: tabletId });
     } catch {}
   }
@@ -352,7 +333,6 @@ useEffect(() => {
       const pts = Number(row?.points_awarded ?? 0);
       const newPts = Number(row?.new_points ?? 0);
 
-      // ✅ optional: keep success beep for save
       beep(1120, 120);
       vibrate(45);
 
@@ -392,25 +372,32 @@ useEffect(() => {
     return () => clearInterval(t);
   }, []);
 
-  // ---------- redeem handshake polling (UNCHANGED logic) ----------
+  // ✅✅ REDEEM POLL (THIS is the fix)
+  // Polls the DB for pending requests for THIS tablet, marks fulfilled, returns coupon_upc.
   useEffect(() => {
+    if (!tabletId) return;
+
     const t = setInterval(async () => {
       try {
-        const { data, error } = await supabase.rpc("claim_next_redemption_for_tablet", {
-        p_tablet_id: tabletId,
+        const { data, error } = await supabase.rpc("fulfill_latest_redemption_for_tablet", {
+          p_tablet_id: tabletId,
         });
+
         if (error) return;
 
-      const row = Array.isArray(data) ? data[0] : data;
-      if (!row) return;
+        const row = Array.isArray(data) ? data[0] : data;
+        if (!row) return;
 
-      // POPUP HERE:
-      openCouponPopup(row); // row.coupon_upc is your barcode value
+        const upc = String(row.coupon_upc || "");
+        if (!upc) return;
 
+        beep(1200, 140);
+        vibrate(70);
 
-        setRedeemUpc(String(row.coupon_upc));
-        setRedeemCents(Number(row.cents_off ?? 0));
-        setRedeemMsg(`Coupon ready ✅ $${(Number(row.cents_off ?? 0) / 100).toFixed(2)} OFF`);
+        setRedeemUpc(upc);
+        const cents = Number(row.cents_off ?? 0);
+        setRedeemCents(cents);
+        setRedeemMsg(`Coupon ready ✅ $${(cents / 100).toFixed(2)} OFF`);
         setRedeemOpen(true);
 
         setTimeout(() => {
@@ -440,7 +427,7 @@ useEffect(() => {
       return;
     }
     if (/^\d$/.test(k)) {
-      setAmountRaw((x) => (x + k).slice(0, 8)); // max 8 digits
+      setAmountRaw((x) => (x + k).slice(0, 8));
     }
   }
 
@@ -453,19 +440,16 @@ useEffect(() => {
         input { user-select: text; }
 
         .kioskRoot {
-        height: 100vh;
-        width: 100vw;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        padding: 14px;
-        box-sizing: border-box;
-        background: #f3f7ff;
-
-        /* --- screen nudge for 1340x800 tablet --- */
-        transform: translate(-70px, -105px);  /* left, up */
+          height: 100vh;
+          width: 100vw;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          padding: 14px;
+          box-sizing: border-box;
+          background: #f3f7ff;
+          transform: translate(-70px, -105px);
         }
-
 
         .topBar {
           display: flex; align-items: center; justify-content: space-between;
@@ -571,24 +555,23 @@ useEffect(() => {
         }
 
         .saleGrid {
-        margin-top: 14px;
-        display: grid;
-        grid-template-columns: repeat(4, 1fr); /* was 1fr 1fr */
-        gap: 14px;
+          margin-top: 14px;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 14px;
         }
 
         .saleCard {
-        border-radius: 22px;
-        border: 1px solid rgba(10,60,160,0.14);
-        background: #f8fbff;
-        padding: 14px;
-        display: grid;
-        gap: 10px;
-        min-height: 260px;           /* makes them taller */
-        align-content: start;
+          border-radius: 22px;
+          border: 1px solid rgba(10,60,160,0.14);
+          background: #f8fbff;
+          padding: 14px;
+          display: grid;
+          gap: 10px;
+          min-height: 260px;
+          align-content: start;
         }
 
-        }
         .saleName { font-weight: 950; font-size: 18px; color: #0a2a7a; }
         .salePrice { font-weight: 950; font-size: 22px; color: #1d4ed8; }
         .saleUpc { font-weight: 900; color: rgba(10,42,122,0.60); font-size: 12px; }
@@ -612,11 +595,11 @@ useEffect(() => {
         .keyDone { background: #1d4ed8; color: #fff; border-color: #1d4ed8; grid-column: 1 / -1; }
 
         @media (max-width: 900px) {
-        .grid2 { grid-template-columns: 1fr; }
-        .saleGrid { grid-template-columns: repeat(2, 1fr); }
+          .grid2 { grid-template-columns: 1fr; }
+          .saleGrid { grid-template-columns: repeat(2, 1fr); }
         }
-
       `}</style>
+
       <div className="topBar">
         <div className="brand">
           <span className="dot" />
@@ -632,7 +615,9 @@ useEffect(() => {
           <button className={"tabBtn " + (tab === 1 ? "tabBtnActive" : "")} onClick={() => setTab(1)}>
             Sale
           </button>
-          <button className="tabBtn tabBtnDanger" onClick={disconnect}>Disconnect</button>
+          <button className="tabBtn tabBtnDanger" onClick={disconnect}>
+            Disconnect
+          </button>
         </div>
       </div>
 
@@ -645,14 +630,11 @@ useEffect(() => {
           </div>
 
           <div className="grid2">
-            {/* Receipt amount (NO system keyboard) */}
             <div>
               <div className="label">Receipt Amount</div>
               <div className="amountBox" onClick={() => setPadOpen(true)}>
                 <div>
-                  <div style={{ lineHeight: 1.1 }}>
-                    {amountRaw ? amountRaw : "Tap to enter"}
-                  </div>
+                  <div style={{ lineHeight: 1.1 }}>{amountRaw ? amountRaw : "Tap to enter"}</div>
                   <div className="amountHint">Type cents: 1298 = $12.98</div>
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 950, color: "#1d4ed8" }}>
@@ -662,7 +644,6 @@ useEffect(() => {
               <div className="moneyPreview">{formatMoneyFromRaw(amountRaw)}</div>
             </div>
 
-            {/* Member ID */}
             <div>
               <div className="label">Member ID</div>
               <div className="bigInput" style={{ display: "flex", alignItems: "center" }}>
@@ -697,11 +678,17 @@ useEffect(() => {
           </div>
 
           {saleLoading ? (
-            <div className="statusBox" style={{ marginTop: 14 }}>Loading sale items…</div>
+            <div className="statusBox" style={{ marginTop: 14 }}>
+              Loading sale items…
+            </div>
           ) : saleStatus ? (
-            <div className="statusBox" style={{ marginTop: 14 }}>{saleStatus}</div>
+            <div className="statusBox" style={{ marginTop: 14 }}>
+              {saleStatus}
+            </div>
           ) : sale.length === 0 ? (
-            <div className="statusBox" style={{ marginTop: 14 }}>No active sale items.</div>
+            <div className="statusBox" style={{ marginTop: 14 }}>
+              No active sale items.
+            </div>
           ) : (
             <div className="saleGrid">
               {sale.slice(0, 8).map((it) => (
@@ -723,13 +710,19 @@ useEffect(() => {
       {scanning && (
         <div className="overlay" onClick={stopScanner}>
           <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
-            <div className="title" style={{ fontSize: 18 }}>Scan QR</div>
-            <div className="muted" style={{ marginTop: 6 }}>Center the member QR in the box.</div>
+            <div className="title" style={{ fontSize: 18 }}>
+              Scan QR
+            </div>
+            <div className="muted" style={{ marginTop: 6 }}>
+              Center the member QR in the box.
+            </div>
             <div style={{ marginTop: 12 }}>
-              <div id={readerDivId} style={{ width: "100%" }} />
+              <div id={"qr-reader"} style={{ width: "100%" }} />
             </div>
             <div className="bigBtnRow" style={{ marginTop: 12 }}>
-              <button className="bigBtn" onClick={stopScanner}>Close</button>
+              <button className="bigBtn" onClick={stopScanner}>
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -739,8 +732,12 @@ useEffect(() => {
       {padOpen && (
         <div className="overlay" onClick={() => setPadOpen(false)}>
           <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
-            <div className="title" style={{ fontSize: 18 }}>Enter Amount</div>
-            <div className="muted" style={{ marginTop: 6 }}>Type cents: 1298 = $12.98</div>
+            <div className="title" style={{ fontSize: 18 }}>
+              Enter Amount
+            </div>
+            <div className="muted" style={{ marginTop: 6 }}>
+              Type cents: 1298 = $12.98
+            </div>
 
             <div className="moneyPreview" style={{ textAlign: "center", marginTop: 12 }}>
               {formatMoneyFromRaw(amountRaw)}
@@ -748,23 +745,35 @@ useEffect(() => {
 
             <div className="keypad">
               {"123456789".split("").map((d) => (
-                <button key={d} className="key" onClick={() => keyPress(d)}>{d}</button>
+                <button key={d} className="key" onClick={() => keyPress(d)}>
+                  {d}
+                </button>
               ))}
-              <button className="key keyAlt" onClick={() => keyPress("clear")}>Clear</button>
-              <button className="key" onClick={() => keyPress("0")}>0</button>
-              <button className="key keyAlt" onClick={() => keyPress("back")}>⌫</button>
-              <button className="key keyDone" onClick={() => keyPress("done")}>Done</button>
+              <button className="key keyAlt" onClick={() => keyPress("clear")}>
+                Clear
+              </button>
+              <button className="key" onClick={() => keyPress("0")}>
+                0
+              </button>
+              <button className="key keyAlt" onClick={() => keyPress("back")}>
+                ⌫
+              </button>
+              <button className="key keyDone" onClick={() => keyPress("done")}>
+                Done
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* REDEEM POPUP (cashier only, handshake unchanged) */}
+      {/* REDEEM POPUP */}
       {redeemOpen && redeemUpc && (
         <div className="overlay" onClick={() => setRedeemOpen(false)}>
           <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
             <div className="title">Redeem Coupon</div>
-            <div className="muted" style={{ marginTop: 6 }}>{redeemMsg}</div>
+            <div className="muted" style={{ marginTop: 6 }}>
+              {redeemMsg}
+            </div>
 
             <div style={{ marginTop: 14 }}>
               <BarcodeCanvas upc={redeemUpc} />
@@ -774,7 +783,9 @@ useEffect(() => {
             </div>
 
             <div className="bigBtnRow" style={{ marginTop: 14 }}>
-              <button className="bigBtn bigBtnPrimary" onClick={() => setRedeemOpen(false)}>Done</button>
+              <button className="bigBtn bigBtnPrimary" onClick={() => setRedeemOpen(false)}>
+                Done
+              </button>
             </div>
           </div>
         </div>
@@ -782,7 +793,5 @@ useEffect(() => {
     </div>
   );
 }
-function openCouponPopup(row: any) {
-  throw new Error("Function not implemented.");
-}
+
 
