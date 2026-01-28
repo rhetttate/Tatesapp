@@ -11,7 +11,6 @@ export default function MemberPage() {
   const [authUid, setAuthUid] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-;
 
   // signup extras (ONLY for create account popup)
   const [signupOpen, setSignupOpen] = useState(false);
@@ -102,6 +101,12 @@ export default function MemberPage() {
 
 
       const row = Array.isArray(data) ? data[0] : data;
+      if (!row) {
+      setConnected(false);
+      setConnectedTablet(null);
+      setLastSeenMsAgo(null);
+      return;
+      }
       const lastSeen = row?.last_seen ? new Date(row.last_seen).getTime() : 0;
       const msAgo = lastSeen ? Date.now() - lastSeen : null;
 
@@ -343,10 +348,9 @@ export default function MemberPage() {
       const em = (emailOverride ?? email).trim();
       if (!em) throw new Error("Enter your email first.");
 
-      const { error } = await supabase.auth.resetPasswordForEmail(em, {
-        redirectTo: `${window.location.origin}/reset`,
-      });
-      if (error) throw error;
+     await supabase.auth.resetPasswordForEmail(em, {
+      redirectTo: `${window.location.origin}/reset`,
+    });
 
       setResetStatus("Reset email sent ✅ Check your inbox.");
     } catch (e: any) {
@@ -427,6 +431,15 @@ export default function MemberPage() {
           background: rgba(29,78,216,0.10); color: #1d4ed8;
           font-weight: 950;
         }
+          .xBtn {
+          border: 0;
+          background: transparent;
+          color: rgba(10,42,122,0.55);
+          font-weight: 950;
+          font-size: 18px;
+          cursor: pointer;
+        }
+
 
         /* Redeem bottom sheet */
         .sheetWrap {
