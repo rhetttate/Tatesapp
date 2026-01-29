@@ -372,8 +372,7 @@ export default function CashierPage() {
     return () => clearInterval(t);
   }, []);
 
-  // ✅✅ REDEEM POLL (THIS is the fix)
-  // Polls the DB for pending requests for THIS tablet, marks fulfilled, returns coupon_upc.
+  // ✅ REDEEM POLL
   useEffect(() => {
     if (!tabletId) return;
 

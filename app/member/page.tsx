@@ -12,7 +12,7 @@ export default function MemberPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // signup extras (ONLY for create account popup)
+  // signup extras
   const [signupOpen, setSignupOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [smsOptIn, setSmsOptIn] = useState(false);
@@ -47,7 +47,7 @@ export default function MemberPage() {
   const qrBuiltFor = useRef<string | null>(null);
 
   // ----------------------------
-  // Load points + QR (fast poll)
+  // Load points + QR
   // ----------------------------
   async function loadPointsById(id: string) {
     const { data, error } = await supabase
@@ -69,7 +69,7 @@ export default function MemberPage() {
   }
 
   // ----------------------------
-  // Load phone settings (NOT polled)
+  // Load phone settings
   // ----------------------------
   async function loadPhoneSettingsById(id: string) {
     const { data, error } = await supabase
@@ -80,7 +80,6 @@ export default function MemberPage() {
 
     if (error) throw error;
 
-    // only set if user isn't currently editing
     if (!phoneDirty) setPhone(((data as any)?.phone ?? "") as string);
     if (!smsDirty) setSmsOptIn(!!(data as any)?.sms_opt_in);
   }
@@ -90,15 +89,11 @@ export default function MemberPage() {
   // ------------------------------------------
   async function refreshConnection(memberId: string) {
     try {
-      // expects p_member_token UUID (string is fine as long as it's a uuid)
       const { data, error } = await supabase.rpc("get_cashier_link_for_member", {
         p_member_token: memberId,
       });
 
-      if (error) {
-        console.error("get_cashier_link_for_member error:", error);
-        throw error;
-      }
+      if (error) throw error;
 
       const row = Array.isArray(data) ? data[0] : data;
       if (!row) {
@@ -118,7 +113,6 @@ export default function MemberPage() {
       setConnectedTablet(isConnected ? (row.tablet_id as string) : null);
       setLastSeenMsAgo(msAgo);
 
-      // Open redeem sheet when connected (only if they have points)
       if (isConnected && points > 0) setRedeemSheetOpen(true);
 
       if (!isConnected) {
@@ -160,6 +154,7 @@ export default function MemberPage() {
 
       setSettingsOpen(false);
       setResetStatus("");
+      setRedeemStatus("");
       return;
     }
 
@@ -172,7 +167,6 @@ export default function MemberPage() {
     const id = memberId as string;
     setMemberUuid(id);
 
-    // after login, DB can be source of truth again
     setPhoneDirty(false);
     setSmsDirty(false);
 
@@ -364,8 +358,7 @@ export default function MemberPage() {
   }
 
   // ----------------------------
-  // Redeem request (UPDATED to match Supabase)
-  // Uses: request_redemption_for_active_link(p_member_token uuid)
+  // Redeem request
   // ----------------------------
   async function requestRedeem() {
     setRedeemStatus("");
