@@ -245,6 +245,7 @@ export default function DealsHomePage() {
         <div className="tabs">
           <Link href="/" className={"tab tabActive"}>Deals</Link>
           <Link href="/member" className={"tab"}>Points</Link>
+          <Link href="/coupons" className="tab">Coupons</Link>
         </div>
 
         <div className="card">
