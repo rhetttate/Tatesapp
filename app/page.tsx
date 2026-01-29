@@ -333,7 +333,7 @@ export default function DealsHomePage() {
         <div className="logoBar">
           <div className="logoBox">
             {/* Put a file at /public/logo.png (or change the src here) */}
-            <img className="logoImg" src="Tatessignlogo.jpg" />
+            <img className="logoImg" src="tatessign.png" />
           </div>
         </div>
 
