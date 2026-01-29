@@ -325,25 +325,51 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   }
 
   useEffect(() => {
-    let alive = true;
+  let alive = true;
 
-    (async () => {
-      try {
-        await checkAuth();
-      } finally {
-        if (alive) setBooting(false);
+  const init = async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user ?? null;
+
+      if (!alive) return;
+
+      if (!user) {
+        setAuthed(false);
+        setIsAdmin(false);
+      } else {
+        const email = (user.email ?? "").toLowerCase();
+        setAuthed(true);
+        setIsAdmin(ADMIN_EMAIL_ALLOWLIST.includes(email));
       }
-    })();
+    } finally {
+      if (alive) setBooting(false); // 🔑 ALWAYS clear booting
+    }
+  };
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async () => {
-      await checkAuth();
-    });
+  init();
 
-    return () => {
-      alive = false;
-      sub.subscription.unsubscribe();
-    };
-  }, []);
+  const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (!alive) return;
+
+    const user = session?.user ?? null;
+
+    if (!user) {
+      setAuthed(false);
+      setIsAdmin(false);
+    } else {
+      const email = (user.email ?? "").toLowerCase();
+      setAuthed(true);
+      setIsAdmin(ADMIN_EMAIL_ALLOWLIST.includes(email));
+    }
+  });
+
+  return () => {
+    alive = false;
+    sub.subscription.unsubscribe();
+  };
+}, []);
+
 
   async function signOut() {
     await supabase.auth.signOut();
