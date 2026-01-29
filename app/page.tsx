@@ -49,6 +49,11 @@ function SwipeRow({
 }) {
   const rowRef = useRef<HTMLDivElement | null>(null);
 
+  // simple “nudge to start” helper (optional)
+  useEffect(() => {
+    // do nothing
+  }, []);
+
   if (!deals.length) return null;
 
   return (
@@ -58,16 +63,15 @@ function SwipeRow({
         <div className="muted" style={{ fontSize: 12 }}>Swipe →</div>
       </div>
 
-      <div ref={rowRef} className="swipeRow" aria-label={title}>
+      <div
+        ref={rowRef}
+        className="swipeRow"
+        aria-label={title}
+      >
         {deals.map((d) => (
           <div key={d.id} className={"dealCard " + (compact ? "dealCardCompact" : "")}>
             {d.image_url ? (
-              <img
-                className={"dealImg " + (compact ? "dealImgCompact" : "")}
-                src={d.image_url}
-                alt={String(d.name ?? "Deal")}
-                draggable={false}
-              />
+              <img className={"dealImg " + (compact ? "dealImgCompact" : "")} src={d.image_url} alt={String(d.name ?? "Deal")} />
             ) : (
               <div className={"dealImg " + (compact ? "dealImgCompact" : "")} />
             )}
@@ -90,6 +94,7 @@ export default function DealsHomePage() {
   const [status, setStatus] = useState("");
 
   // ✅ set to 0 to disable auto-refresh completely
+  // ✅ set to 60000 for “once a minute”
   const AUTO_REFRESH_MS = 0;
 
   async function loadDeals() {
@@ -139,39 +144,9 @@ export default function DealsHomePage() {
   }, [deals]);
 
   return (
-    <div className="pageRoot">
+    <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
       <style jsx global>{`
         * { -webkit-tap-highlight-color: transparent; }
-        html, body {
-          height: auto;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-          touch-action: pan-y;
-        }
-
-        .pageRoot {
-          min-height: 100vh;
-          background: #f3f7ff;
-          padding: 18px;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-          touch-action: pan-y; /* ✅ vertical scroll anywhere */
-        }
-
-        .pageRoot * {
-          touch-action: pan-y; /* ✅ fixes “won’t scroll over images/cards” */
-        }
-
-        /* Keep horizontal swipe working inside swipe rows */
-        .swipeRow { touch-action: pan-x; }
-        .swipeRow * { touch-action: pan-x; }
-
-        /* iOS: prevent images from “capturing” the gesture */
-        img {
-          -webkit-user-drag: none;
-          user-select: none;
-        }
-
         .wrap { max-width: 980px; margin: 0 auto; }
 
         .tabs {
@@ -188,6 +163,23 @@ export default function DealsHomePage() {
         }
         .title { font-size: 22px; font-weight: 950; color: #0a2a7a; }
         .muted { color: rgba(10,42,122,0.65); font-weight: 800; }
+
+        .badge {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 8px 12px; border-radius: 999px;
+          background: rgba(29,78,216,0.10); color: #1d4ed8;
+          font-weight: 950; font-size: 12px;
+        }
+
+        .btn {
+          padding: 10px 12px;
+          border-radius: 14px;
+          border: 1px solid rgba(29,78,216,0.18);
+          background: #fff;
+          font-weight: 950;
+          color: #1d4ed8;
+          cursor: pointer;
+        }
 
         .hr { height: 1px; background: rgba(29,78,216,0.12); margin: 14px 0; }
 
@@ -207,6 +199,9 @@ export default function DealsHomePage() {
 
           scroll-snap-type: x mandatory;
           -webkit-overflow-scrolling: touch;
+
+          /* important: allow horizontal swipe */
+          touch-action: pan-x;
 
           /* hide scrollbar (most browsers) */
           scrollbar-width: none;
@@ -231,7 +226,6 @@ export default function DealsHomePage() {
           height: 160px;
           object-fit: cover;
           background: #eaf1ff;
-          display: block;
         }
         .dealImgCompact { height: 140px; }
 
@@ -240,81 +234,37 @@ export default function DealsHomePage() {
         .dealDesc { color: rgba(10,42,122,0.70); font-weight: 800; font-size: 14px; line-height: 1.22; }
         .dealPrice { font-weight: 950; font-size: 22px; color: #1d4ed8; margin-top: 2px; }
 
-        /* Logo / brand header */
-        .brandRow {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          margin-bottom: 10px;
-        }
-        .logoBox {
-          height: 44px;
-          width: 44px;
-          border-radius: 14px;
-          background: rgba(29,78,216,0.10);
-          border: 1px solid rgba(29,78,216,0.18);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 950;
-          color: #1d4ed8;
-          overflow: hidden;
-          flex: 0 0 auto;
-        }
-        .logoImg {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
-        .brandText {
-          display: grid;
-          gap: 2px;
-          text-align: center;
-        }
-        .brandName {
-          font-weight: 950;
-          color: #0a2a7a;
-          font-size: 16px;
-          line-height: 1.1;
-        }
-        .brandSub {
-          color: rgba(10,42,122,0.65);
-          font-weight: 850;
-          font-size: 12px;
-          line-height: 1.1;
-        }
-
         @media (max-width: 420px) {
           .dealCard { width: 86vw; }
         }
       `}</style>
 
       <div className="wrap">
-        {/* Top tabs */}
+        {/* Top tabs (same vibe as member page) */}
         <div className="tabs">
           <Link href="/" className={"tab tabActive"}>Deals</Link>
           <Link href="/coupon" className="tab">Coupons</Link>
           <Link href="/member" className="tab">Points</Link>
         </div>
 
-        {/* ✅ Logo spot (replaces the old header row) */}
-        <div className="brandRow">
-          {/* Option 1: Put your real logo image here */}
-          {/* <div className="logoBox"><img className="logoImg" src="/logo.png" alt="Logo" /></div> */}
-
-          {/* Option 2: Placeholder badge until you add /public/logo.png */}
-          <div className="logoBox">TS</div>
-
-          <div className="brandText">
-            <div className="brandName">Tate&apos;s Supermarket</div>
-            <div className="brandSub">{loading ? "Loading…" : `${deals.length} deals`}</div>
-          </div>
-        </div>
-
         <div className="card">
-          {status ? <div style={{ marginTop: 2 }}>{status}</div> : null}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+            <div>
+              <div className="title">Deals</div>
+              <div className="muted" style={{ marginTop: 6 }}>
+                Tate's Supermarket
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <span className="badge">{loading ? "Loading…" : `${deals.length} deals`}</span>
+              <button className="btn" onClick={loadDeals}>Refresh</button>
+            </div>
+          </div>
+
+          {status ? <div style={{ marginTop: 12 }}>{status}</div> : null}
+
+          <div className="hr" />
 
           {featured.length > 0 ? (
             <SwipeRow title="Top Deals" deals={featured} />
