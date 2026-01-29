@@ -163,6 +163,7 @@ a{ color:inherit; text-decoration:none; }
   flex: 0 0 auto;
   width: min(320px, 82vw);
   border-radius: 18px;
+  overflow: hidden;
   background: rgba(255,255,255,0.75);
   border: 1px solid rgba(0,0,0,0.06);
   box-shadow: 0 10px 30px rgba(0,0,0,0.04);
@@ -211,6 +212,7 @@ a{ color:inherit; text-decoration:none; }
   font-size: 13px;
   line-height: 1.25;
   min-height: 34px;
+  overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

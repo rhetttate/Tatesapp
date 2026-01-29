@@ -180,7 +180,22 @@ export default function AdminCouponsPage() {
     loadLog();
   }, []);
 
-  async function save() {  setStatus("");
+  useEffect(() => {
+  if (!open) return;
+
+  const prevHtmlOverflow = document.documentElement.style.overflow;
+  const prevBodyOverflow = document.body.style.overflow;
+
+  document.documentElement.style.overflow = "hidden";
+  document.body.style.overflow = "hidden";
+
+  return () => {
+    document.documentElement.style.overflow = prevHtmlOverflow;
+    document.body.style.overflow = prevBodyOverflow;
+  };
+}, [open]);
+
+  async function save() {setStatus("");
   try {
     // ✅ normalize: allow 11 digits (we auto add check digit in the input)
     // but when saving we enforce 12 digits stored
@@ -470,18 +485,39 @@ export default function AdminCouponsPage() {
         .btnPrimary { background: #1d4ed8; color: #fff; }
         .btnSoft { background: #e8efff; color: #1d4ed8; }
         .overlay {
-          position: fixed; inset: 0;
-          background: rgba(10, 18, 40, 0.45);
-          display: flex; align-items: center; justify-content: center;
-          padding: 18px; z-index: 50;
-        }
-        .overlayCard {
-          width: min(640px, 95vw);
-          background: #fff; border-radius: 22px;
-          padding: 18px;
-          border: 1px solid rgba(29,78,216,0.14);
-          box-shadow: 0 18px 50px rgba(10,42,122,0.18);
-        }
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 18, 40, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            z-index: 50;
+
+            /* ✅ prevents scroll chaining to the page behind */
+            overscroll-behavior: contain;
+
+            /* ✅ touching overlay won't scroll the body */
+            touch-action: none;
+            }
+
+            .overlayCard {
+            width: min(640px, 95vw);
+            background: #fff;
+            border-radius: 22px;
+            padding: 18px;
+            border: 1px solid rgba(29,78,216,0.14);
+            box-shadow: 0 18px 50px rgba(10,42,122,0.18);
+
+            /* ✅ make card scrollable instead of the page */
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+
+            /* ✅ allow vertical scrolling inside card */
+            touch-action: pan-y;
+            }
+
         .xBtn {
           border: 0; background: transparent; color: rgba(10,42,122,0.55);
           font-weight: 950; font-size: 18px; cursor: pointer;
