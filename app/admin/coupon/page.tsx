@@ -47,6 +47,44 @@ async function uploadCouponImage(file: File) {
 function digitsOnly(s: string) {
   return (s || "").replace(/\D/g, "");
 }
+function upcaCheckDigit(upc11: string) {
+  const d = digitsOnly(upc11).slice(0, 11);
+  if (d.length !== 11) return null;
+
+  // UPC-A: (sum odd positions * 3) + sum even positions
+  // positions are 1..11 from left
+  let sumOdd = 0;
+  let sumEven = 0;
+
+  for (let i = 0; i < 11; i++) {
+    const n = parseInt(d[i], 10);
+    const pos = i + 1;
+    if (pos % 2 === 1) sumOdd += n;
+    else sumEven += n;
+  }
+
+  const total = sumOdd * 3 + sumEven;
+  const mod = total % 10;
+  const check = (10 - mod) % 10;
+  return String(check);
+}
+
+function normalizeUpcA(input: string) {
+  const d = digitsOnly(input);
+
+  // If they typed 11 digits, compute check digit
+  if (d.length === 11) {
+    const cd = upcaCheckDigit(d);
+    if (cd == null) return d;
+    return d + cd; // 12 digits
+  }
+
+  // If they pasted 12 digits, keep first 12
+  if (d.length >= 12) return d.slice(0, 12);
+
+  // Otherwise keep as-is (still typing)
+  return d;
+}
 
 export default function AdminCouponsPage() {
   const [rows, setRows] = useState<CouponRow[]>([]);
@@ -142,43 +180,47 @@ export default function AdminCouponsPage() {
     loadLog();
   }, []);
 
-  async function save() {
-    setStatus("");
-    try {
-      const u = digitsOnly(upc);
-      if (u.length !== 12) throw new Error("UPC must be 12 digits (UPC-A, include check digit).");
-      if (!name.trim()) throw new Error("Name required.");
-
-      const payload: any = {
-        name: name.trim(),
-        description: desc.trim(),
-        image_url: imageUrl.trim() || null,
-        upc: u,
-        redeem_type: redeemType,
-        active,
-        sort_order: Number(sortOrder || 100),
-        starts_at: startsAt ? new Date(startsAt).toISOString() : null,
-        ends_at: endsAt ? new Date(endsAt).toISOString() : null,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (editing) {
-        const { error } = await supabase.from("coupons").update(payload).eq("id", editing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("coupons").insert(payload);
-        if (error) throw error;
-      }
-
-      setOpen(false);
-      setEditing(null);
-      resetForm();
-      await load();
-      setStatus("Saved ✅");
-    } catch (e: any) {
-      setStatus("Save error: " + (e?.message ?? String(e)));
+  async function save() {  setStatus("");
+  try {
+    // ✅ normalize: allow 11 digits (we auto add check digit in the input)
+    // but when saving we enforce 12 digits stored
+    const u = digitsOnly(upc).slice(0, 12);
+    if (u.length !== 12) {
+      throw new Error("UPC must be 11 digits (auto check digit) or 12 digits total.");
     }
-  }
+
+    if (!name.trim()) throw new Error("Name required.");
+
+    const payload: any = {
+      name: name.trim(),
+      description: desc.trim(),
+      image_url: imageUrl.trim() || null,
+      upc: u, // ✅ 12-digit UPC-A
+      redeem_type: redeemType,
+      active,
+      sort_order: Number(sortOrder || 100),
+      starts_at: startsAt ? new Date(startsAt).toISOString() : null,
+      ends_at: endsAt ? new Date(endsAt).toISOString() : null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (editing) {
+      const { error } = await supabase.from("coupons").update(payload).eq("id", editing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from("coupons").insert(payload);
+      if (error) throw error;
+    }
+
+    setOpen(false);
+    setEditing(null);
+    resetForm();
+    await load();
+    setStatus("Saved ✅");
+  } catch (e: any) {
+    setStatus("Save error: " + (e?.message ?? String(e)));
+  }}
+    
 
   async function toggleActive(c: CouponRow) {
     setStatus("");
@@ -314,26 +356,25 @@ export default function AdminCouponsPage() {
             <textarea className="input" value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} />
 
             <label className="label" style={{ marginTop: 10 }}>Photo</label>
-            <input
+           <input
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 try {
                 setStatus("Uploading image...");
                 const url = await uploadCouponImage(file);
-                setImageUrl(url); // ✅ this populates your existing imageUrl state
+                setImageUrl(url);
                 setStatus("Image uploaded ✅");
                 } catch (err: any) {
                 setStatus("Upload error: " + (err?.message ?? String(err)));
                 } finally {
-                // allow selecting same image again later
                 e.currentTarget.value = "";
                 }
             }}
             />
+
 
             <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
             Or paste an image URL:
@@ -353,14 +394,22 @@ export default function AdminCouponsPage() {
             ) : null}
 
 
-            <label className="label" style={{ marginTop: 10 }}>UPC-A (12 digits)</label>
+            <label className="label" style={{ marginTop: 10 }}>UPC-A</label>
             <input
-              className="input"
-              value={upc}
-              onChange={(e) => setUpc(e.target.value)}
-              placeholder="20089101298X"
-              inputMode="numeric"
+            className="input"
+            value={upc}
+            onChange={(e) => setUpc(normalizeUpcA(e.target.value))}
+            placeholder="Enter 11 digits (we'll add check digit)"
+            inputMode="numeric"
             />
+
+            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+            Stored UPC (12 digits):{" "}
+            <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                {digitsOnly(upc).slice(0, 12)}
+            </span>
+            </div>
+
             <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
               Clean: <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{cleanUpc}</span>
             </div>
