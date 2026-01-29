@@ -60,18 +60,25 @@ function AdminDashboardQuickStats() {
   useEffect(() => {
     let alive = true;
 
+    // hard timeout so it can never "stick"
+    const timeout = setTimeout(() => {
+      if (!alive) return;
+      setErr((e) => e || "Stats timed out (check RLS/table names).");
+      setLoading(false);
+    }, 4000);
+
     (async () => {
       try {
         setErr("");
         setLoading(true);
 
+        const since = startOfTodayISO();
+
         // total members (count only)
         const m = await supabase.from("members").select("id", { count: "exact", head: true });
         if (m.error) throw m.error;
-        const mc = m.count ?? 0;
 
-        // today purchases + total sales (sum in JS; typically small daily)
-        const since = startOfTodayISO();
+        // today purchases + total sales
         const p = await supabase
           .from("purchases")
           .select("amount, created_at")
@@ -84,24 +91,24 @@ function AdminDashboardQuickStats() {
         const purchaseCount = purchases.length;
         const salesSum = purchases.reduce((acc, row) => acc + Number(row.amount ?? 0), 0);
 
-        // today redemptions (count only)
+        // today redemption requests (use your real table)
         const r = await supabase
-          .from("redemptions")
+          .from("redemption_requests")
           .select("id", { count: "exact", head: true })
           .gte("created_at", since);
         if (r.error) throw r.error;
-        const rc = r.count ?? 0;
 
         if (!alive) return;
 
-        setMembersCount(mc);
+        setMembersCount(m.count ?? 0);
         setTodayPurchases(purchaseCount);
         setTodaySales(salesSum);
-        setTodayRedemptions(rc);
+        setTodayRedemptions(r.count ?? 0);
       } catch (e: any) {
         if (!alive) return;
         setErr(e?.message ?? String(e));
       } finally {
+        clearTimeout(timeout);
         if (!alive) return;
         setLoading(false);
       }
@@ -109,6 +116,7 @@ function AdminDashboardQuickStats() {
 
     return () => {
       alive = false;
+      clearTimeout(timeout);
     };
   }, []);
 
@@ -152,6 +160,7 @@ function AdminDashboardQuickStats() {
     </div>
   );
 }
+
 
 function AdminLogin({
   onDone,
