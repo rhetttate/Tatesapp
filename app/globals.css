@@ -9,14 +9,24 @@
 }
 
 *{ box-sizing:border-box; }
-html,body{ height:100%; }
+html, body {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
 body{
-  margin:0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-  background: radial-gradient(1200px 600px at 20% -10%, rgba(37,99,235,.18), transparent 60%),
-              radial-gradient(1200px 600px at 80% 0%, rgba(37,99,235,.10), transparent 55%),
-              var(--bg);
-  color:var(--text);
+/* Let the entire app scroll even when touching images/cards */
+img, .dealSwipeImg, .dealSwipeImg img, .dealImg {
+  -webkit-user-drag: none;
+  user-select: none;
+  touch-action: pan-y;
+}
+
+.card, .dealSwipeCard, .dealBody, .dealSwipeBody, .grid, .container {
+  touch-action: pan-y;
+}
 }
 
 a{ color:inherit; text-decoration:none; }
@@ -287,12 +297,12 @@ a{ color:inherit; text-decoration:none; }
 .kioskBtn.danger { background: #fee2e2; color: #991b1b; }
 .kioskStatus { margin-top: 10px; font-weight: 900; color: #0a2a7a; }
 
-.overlay {
+.kioskoverlay {
   position: fixed; inset: 0; background: rgba(10,42,122,0.45);
   display: flex; align-items: center; justify-content: center;
   padding: 14px; z-index: 50;
 }
-.modal {
+.kioskmodal {
   width: min(520px, 100%);
   background: #fff; border-radius: 22px;
   border: 1px solid rgba(29,78,216,0.14);
