@@ -30,6 +30,19 @@ type RedemptionRow = {
   source: string;
   coupons?: { name: string } | null;
 };
+async function uploadCouponImage(file: File) {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `coupons/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+
+  const { error: upErr } = await supabase.storage
+    .from("coupon-images")
+    .upload(path, file, { upsert: true, contentType: file.type });
+
+  if (upErr) throw upErr;
+
+  const { data } = supabase.storage.from("coupon-images").getPublicUrl(path);
+  return data.publicUrl;
+}
 
 function digitsOnly(s: string) {
   return (s || "").replace(/\D/g, "");
@@ -300,8 +313,45 @@ export default function AdminCouponsPage() {
             <label className="label" style={{ marginTop: 10 }}>Description</label>
             <textarea className="input" value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} />
 
-            <label className="label" style={{ marginTop: 10 }}>Image URL (optional)</label>
-            <input className="input" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
+            <label className="label" style={{ marginTop: 10 }}>Photo</label>
+            <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try {
+                setStatus("Uploading image...");
+                const url = await uploadCouponImage(file);
+                setImageUrl(url); // ✅ this populates your existing imageUrl state
+                setStatus("Image uploaded ✅");
+                } catch (err: any) {
+                setStatus("Upload error: " + (err?.message ?? String(err)));
+                } finally {
+                // allow selecting same image again later
+                e.currentTarget.value = "";
+                }
+            }}
+            />
+
+            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+            Or paste an image URL:
+            </div>
+
+            <input
+            className="input"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://..."
+            />
+
+            {imageUrl ? (
+            <div style={{ marginTop: 10 }}>
+                <img src={imageUrl} alt="preview" style={{ width: "100%", borderRadius: 14 }} />
+            </div>
+            ) : null}
+
 
             <label className="label" style={{ marginTop: 10 }}>UPC-A (12 digits)</label>
             <input

@@ -490,7 +490,7 @@ export default function MemberPage() {
       <div className="wrap">
         <div className="tabs">
           <Link href="/" className="tab">Deals</Link>
-          <Link href="/coupon" className="tab">Coupons</Link>
+          <Link href="/coupon" className="tab">Coupon</Link>
           <span className="tab tabActive">Points</span>
         </div>
 

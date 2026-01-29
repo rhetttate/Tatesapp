@@ -42,38 +42,68 @@ function vibrate(ms = 40) {
 
 function BarcodeCanvas({ upc }: { upc: string }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
     let cancelled = false;
+    setErr("");
+
     (async () => {
       try {
         const mod: any = await import("bwip-js");
         const bwipjs = mod?.default ?? mod;
-        if (cancelled) return;
 
         const canvas = ref.current;
         if (!canvas) return;
 
+        const text12 = digitsOnly(upc).slice(0, 12);
+        if (text12.length !== 12) {
+          setErr(`UPC must be 12 digits. Got "${text12}"`);
+          return;
+        }
+
+        // bwip likes a real canvas size
+        canvas.width = 600;
+        canvas.height = 220;
+
         bwipjs.toCanvas(canvas, {
           bcid: "upca",
-          text: digitsOnly(upc).slice(0, 12),
+          text: text12,
           scale: 3,
-          height: 10,
+          height: 14,
           includetext: true,
         });
-      } catch {}
+      } catch (e: any) {
+        if (!cancelled) setErr(e?.message ?? "Barcode render failed");
+      }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [upc]);
 
+  const text12 = digitsOnly(upc).slice(0, 12);
+
   return (
-    <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+    <div style={{ width: "100%", display: "grid", justifyContent: "center", gap: 8 }}>
       <div style={{ width: "100%", maxWidth: 360 }}>
         <canvas
           ref={ref}
           style={{ width: "100%", height: 110, borderRadius: 14, background: "#fff" }}
         />
       </div>
+
+      {/* fallback */}
+      <div style={{ textAlign: "center", fontWeight: 900, color: "#0a2a7a" }}>
+        {text12}
+      </div>
+
+      {err ? (
+        <div style={{ textAlign: "center", fontWeight: 800, color: "#b91c1c", fontSize: 12 }}>
+          {err}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -230,8 +260,8 @@ export default function CouponsPage() {
       <div className="wrap">
         <div className="tabs">
           <Link href="/" className="tab">Deals</Link>
+          
           <Link href="/members" className="tab">Points</Link>
-          <span className="tab tabActive">Coupons</span>
         </div>
 
         <div className="card">
