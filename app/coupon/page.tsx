@@ -239,7 +239,7 @@ export default function CouponsPage() {
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-              <Link href="/members" className="btn btnPrimary" style={{ flex: 1, textAlign: "center" }}>
+              <Link href="/member" className="btn btnPrimary" style={{ flex: 1, textAlign: "center" }}>
                 Sign in
               </Link>
               <Link href="/" className="btn btnSoft" style={{ flex: 1, textAlign: "center" }}>
