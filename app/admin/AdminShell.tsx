@@ -499,6 +499,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
         <div className="tabs">
           <Link href="/admin" className={tabClass("/admin")}>Dashboard</Link>
+          <Link href="/admin/coupons" className={tabClass("/admin/coupons")}>Coupons</Link>
           <Link href="/admin/deals" className={tabClass("/admin/deals")}>Deals</Link>
           <Link href="/admin/members" className={tabClass("/admin/members")}>Members</Link>
           <Link href="/admin/sales" className={tabClass("/admin/sales")}>Sales</Link>
