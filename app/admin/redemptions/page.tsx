@@ -8,8 +8,13 @@ type RedemptionRow = {
   member_id: string;
   points_redeemed: number;
   cents_off: number;
+  coupon_upc: string | null;
+  tablet_id: string | null;
+  status: string;
   created_at: string;
+  fulfilled_at: string | null;
 };
+
 
 function ymd(d: Date) {
   const yyyy = d.getFullYear();
@@ -30,22 +35,24 @@ export default function AdminRedemptionsPage() {
   }, [date]);
 
   async function load() {
-    setStatus("");
-    try {
-      const { data, error } = await supabase
-        .from("redemptions")
-        .select("id,member_id,points_redeemed,cents_off,created_at")
-        .gte("created_at", range.start)
-        .lte("created_at", range.end)
-        .order("created_at", { ascending: false })
-        .limit(200);
+  setStatus("");
+  try {
+    const { data, error } = await supabase
+      .from("redemption_requests")
+      .select("id,member_id,points_redeemed,cents_off,coupon_upc,tablet_id,status,created_at,fulfilled_at")
+      .gte("created_at", range.start)
+      .lte("created_at", range.end)
+      .eq("status", "fulfilled")
+      .order("created_at", { ascending: false })
+      .limit(200);
 
-      if (error) throw error;
-      setRows((data as any) || []);
-    } catch (e: any) {
-      setStatus("Load error: " + (e?.message ?? String(e)));
-    }
+    if (error) throw error;
+    setRows((data as any) || []);
+  } catch (e: any) {
+    setStatus("Load error: " + (e?.message ?? String(e)));
   }
+}
+
 
   useEffect(() => { load(); }, [range.start, range.end]);
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { supabasePublic } from "../../../lib/supabase_public";
+import { supabase } from "../../../lib/supabase";
 
 
 type MemberRow = {
@@ -23,7 +23,7 @@ export default function AdminMembersPage() {
   async function load() {
     setStatus("");
     try {
-      let req = supabasePublic
+      let req = supabase
         .from("members")
         .select("id,name,email,points,created_at")
         .order("created_at", { ascending: false })
@@ -35,7 +35,7 @@ export default function AdminMembersPage() {
         const looksUuid = query.length >= 8;
         if (looksUuid) {
           // Try exact id
-          const { data: exact } = await supabasePublic
+          const { data: exact } = await supabase
             .from("members")
             .select("id,name,email,points,created_at")
             .eq("id", query)
@@ -47,7 +47,7 @@ export default function AdminMembersPage() {
           }
         }
 
-        req = supabasePublic
+        req = supabase
           .from("members")
           .select("id,name,email,points,created_at")
           .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
