@@ -244,8 +244,8 @@ export default function DealsHomePage() {
         {/* Top tabs (same vibe as member page) */}
         <div className="tabs">
           <Link href="/" className={"tab tabActive"}>Deals</Link>
-          <Link href="/member" className={"tab"}>Points</Link>
           <Link href="/coupon" className="tab">Coupons</Link>
+          <Link href="/member" className="tab">Points</Link>
         </div>
 
         <div className="card">
