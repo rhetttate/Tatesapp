@@ -260,8 +260,8 @@ export default function CouponsPage() {
       <div className="wrap">
         <div className="tabs">
           <Link href="/" className="tab">Deals</Link>
-          
-          <Link href="/members" className="tab">Points</Link>
+          <Link href="/coupon" className="tab tabActive">Coupons</Link>
+          <Link href="/member" className="tab">Points</Link>
         </div>
 
         <div className="card">
