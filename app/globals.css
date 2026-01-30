@@ -28,10 +28,12 @@ body{
               radial-gradient(1200px 600px at 80% 0%, rgba(37,99,235,.10), transparent 55%),
               var(--bg);
   color:var(--text);
-  touch-action: pan-y; /* vertical scroll everywhere */
+
+  /* ✅ vertical scroll everywhere */
+  touch-action: pan-y;
 }
 
-/* ✅ Images should NOT steal touch/scroll, but allow tapping on cards */
+/* ✅ Images should NOT steal touch/scroll */
 img{
   -webkit-user-drag: none;
   user-select: none;
@@ -50,7 +52,7 @@ img{
   background: var(--card);
   border:1px solid var(--border);
   border-radius:18px;
-  box-shadow: none;
+  box-shadow: none; /* ✅ no shadow */
 }
 
 .btn{
@@ -61,7 +63,6 @@ img{
   cursor:pointer;
   font-weight:800;
 }
-
 .btnPrimary{
   background: linear-gradient(180deg, var(--blue), var(--blue2));
   color:#fff;
@@ -100,7 +101,9 @@ img{
 }
 
 /* =========================================================
-   ✅ CAROUSEL (Horizontal rows) — smooth + consistent sizing
+   ✅ CAROUSEL (Horizontal rows)
+   KEY FIX: allow BOTH pan-x + pan-y on the row
+   so vertical scroll always wins if the gesture is vertical.
    ========================================================= */
 .swipeRow, .hscroll{
   display: flex;
@@ -110,12 +113,11 @@ img{
   padding: 2px 2px 12px;
   -webkit-overflow-scrolling: touch;
 
-  /* smooth, non-snap carousel */
   scroll-snap-type: none;
   scroll-behavior: smooth;
 
-  /* only horizontal gesture inside the row */
-  touch-action: pan-x;
+  /* ✅ THIS is the fix (do NOT set pan-x only) */
+  touch-action: pan-x pan-y;
 
   scrollbar-width: none;
 }
@@ -131,32 +133,57 @@ img{
 .dealCard,
 .dealCardCompact{
   flex: 0 0 auto;
-  width: min(340px, 86vw);          /* ✅ same size in every row */
-  border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08); /* ✅ thinner border */
+
+  /* ✅ force all rows to same size (fixes Top Deals being huge) */
+  width: 320px;
+
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
   background: #ffffff;
   overflow: hidden;
   display: grid;
-  box-shadow: none;                 /* ✅ no shadow */
+  box-shadow: none;
+
+  /* ✅ allow vertical scroll even when touching card */
+  touch-action: pan-y;
 }
 
-/* ✅ IMPORTANT: define the image properly so it fits */
-/* ✅ Make images bleed past the side padding ("off the screen" look) */
+/* ✅ same width on small screens */
+@media (max-width: 420px){
+  .dealCard,
+  .dealCardCompact{
+    width: 86vw;
+  }
+}
+
+/* ✅ IMAGE MUST have a real height + object-fit */
 .dealImg,
 .dealImgCompact{
-  width: calc(100% + 36px);   /* 18px left + 18px right */
+  height: 180px;
+  width: 100%;
+  object-fit: cover;
+  display: block;
+  background: #e5e7eb;
+}
+
+/* ✅ Make images bleed past the side padding ("off the screen" look)
+   NOTE: your page uses 18px padding, so we bleed by 18px each side.
+*/
+.dealImg,
+.dealImgCompact{
+  width: calc(100% + 36px);
   margin-left: -18px;
   margin-right: -18px;
   border-radius: 0;
 }
 
+/* ✅ images do not block scrolling */
+.dealImg,
+.dealImgCompact{
+  pointer-events: none;
+}
 
-/* If you want compact rows later, just reduce height:
-   .dealImgCompact { height: 150px; }
-   but right now you want them all same size.
-*/
-.dealImgCompact{ height: 170px; }   /* ✅ force same height */
-
+/* text */
 .dealBody{ padding: 14px; display: grid; gap: 7px; }
 
 .dealName{
@@ -176,19 +203,6 @@ img{
   font-size: 22px;
   color: #1d4ed8;
   margin-top: 2px;
-}
-
-/* =========================================================
-   ✅ KEEP vertical scroll working even over the carousel/cards
-   ========================================================= */
-/* Let the browser decide whether the gesture is vertical or horizontal */
-.swipeRow, .hscroll{
-  touch-action: pan-x; /* keep horizontal feel */
-}
-
-/* On iOS, images can sometimes “grab” touch — disable on images only */
-.dealImg, .dealImgCompact{
-  pointer-events: none;
 }
 
 /* =========================================================
@@ -223,15 +237,3 @@ img{
 }
 .kioskBtn.primary { background: #1d4ed8; color: #fff; }
 .kioskBtn.danger { background: #fee2e2; color: #991b1b; }
-
-/* ✅ Scroll works even when touching a deal card */
-.dealCard,
-.dealBody{
-  touch-action: pan-y;
-}
-
-/* ✅ Carousel still swipes sideways, but allows vertical scroll to win when you scroll */
-.swipeRow,
-.hscroll{
-  touch-action: pan-x pan-y;
-}
