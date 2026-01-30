@@ -200,3 +200,17 @@ img{
 .kioskBtn.primary { background: #1d4ed8; color: #fff; }
 .kioskBtn.danger { background: #fee2e2; color: #991b1b; }
 
+/* ✅ Allow page to scroll vertically even when finger is on a deal card */
+.swipeRow,
+.hscroll {
+  touch-action: auto !important;       /* was pan-x */
+  overscroll-behavior-x: contain;      /* helps prevent back/forward hijack */
+}
+
+/* ✅ Make sure the cards themselves don’t “capture” the touch */
+.dealCard,
+.dealBody {
+  pointer-events: none;
+}
+
+/* images already had pointer-events:none, keep it */
