@@ -283,3 +283,44 @@ img{
   object-fit: cover !important;
   display: block !important;
 }
+
+/* ===== Shared TopNav (Logo + Tabs) ===== */
+.topNavWrap { margin-bottom: 14px; }
+
+.logoBar {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 6px;
+}
+
+.logoBox {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(29,78,216,0.12);
+  background: #ffffff;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logoImg {
+  height: 48px;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 44px;
+  font-weight: 950;
+  margin: 10px 0 0;
+}
+
+.tab { text-decoration: none; color: #94a3b8; padding-bottom: 6px; }
+.tabActive { color: #1d4ed8; border-bottom: 3px solid #1d4ed8; }

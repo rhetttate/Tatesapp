@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { supabase } from "../../lib/supabase";
+import TopNav from "../components/topnav";
 
 export default function MemberPage() {
   // auth
@@ -393,12 +394,6 @@ export default function MemberPage() {
       <style jsx global>{`
         * { -webkit-tap-highlight-color: transparent; }
         .wrap { max-width: 560px; margin: 0 auto; }
-        .tabs {
-          display: flex; justify-content: center; gap: 44px;
-          font-weight: 950; margin-bottom: 14px;
-        }
-        .tab { text-decoration: none; color: #94a3b8; padding-bottom: 6px; }
-        .tabActive { color: #1d4ed8; border-bottom: 3px solid #1d4ed8; }
         .card {
           background: #fff; border-radius: 22px; padding: 18px;
           border: 1px solid rgba(29,78,216,0.14);
@@ -488,11 +483,7 @@ export default function MemberPage() {
       `}</style>
 
       <div className="wrap">
-        <div className="tabs">
-          <Link href="/" className="tab">Deals</Link>
-          <Link href="/coupon" className="tab">Coupon</Link>
-          <span className="tab tabActive">Points</span>
-        </div>
+        <TopNav />
 
         {!authUid ? (
           <div className="card">

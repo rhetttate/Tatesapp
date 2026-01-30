@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import TopNav from "../components/topnav";
 
 function digitsOnly(s: string) {
   return (s || "").replace(/\D/g, "");
@@ -27,7 +28,9 @@ function beep(freq = 880, ms = 120) {
     o.start();
     o.stop(ctx.currentTime + ms / 1000 + 0.02);
     setTimeout(() => {
-      try { ctx.close(); } catch {}
+      try {
+        ctx.close();
+      } catch {}
     }, ms + 120);
   } catch {}
 }
@@ -62,7 +65,6 @@ function BarcodeCanvas({ upc }: { upc: string }) {
           return;
         }
 
-        // bwip likes a real canvas size
         canvas.width = 600;
         canvas.height = 220;
 
@@ -88,21 +90,13 @@ function BarcodeCanvas({ upc }: { upc: string }) {
   return (
     <div style={{ width: "100%", display: "grid", justifyContent: "center", gap: 8 }}>
       <div style={{ width: "100%", maxWidth: 360 }}>
-        <canvas
-          ref={ref}
-          style={{ width: "100%", height: 110, borderRadius: 14, background: "#fff" }}
-        />
+        <canvas ref={ref} style={{ width: "100%", height: 110, borderRadius: 14, background: "#fff" }} />
       </div>
 
-      {/* fallback */}
-      <div style={{ textAlign: "center", fontWeight: 900, color: "#0a2a7a" }}>
-        {text12}
-      </div>
+      <div style={{ textAlign: "center", fontWeight: 900, color: "#0a2a7a" }}>{text12}</div>
 
       {err ? (
-        <div style={{ textAlign: "center", fontWeight: 800, color: "#b91c1c", fontSize: 12 }}>
-          {err}
-        </div>
+        <div style={{ textAlign: "center", fontWeight: 800, color: "#b91c1c", fontSize: 12 }}>{err}</div>
       ) : null}
     </div>
   );
@@ -181,6 +175,7 @@ export default function CouponsPage() {
   useEffect(() => {
     if (!authed) return;
     load();
+    // no refresh button — but you still get a load when you open the page
   }, [authed]);
 
   async function redeem(c: CouponRow) {
@@ -218,10 +213,8 @@ export default function CouponsPage() {
     return (
       <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
         <div className="wrap">
-          <div className="card">
-            <div className="title">Coupons</div>
-            <div className="muted" style={{ marginTop: 8 }}>Loading…</div>
-          </div>
+          <TopNav />
+          <div className="muted" style={{ marginTop: 10, textAlign: "center" }}>Loading…</div>
         </div>
         <Style />
       </div>
@@ -232,7 +225,8 @@ export default function CouponsPage() {
     return (
       <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
         <div className="wrap">
-          <div className="card">
+          <TopNav />
+          <div className="card" style={{ marginTop: 12 }}>
             <div className="title">Coupons</div>
             <div className="muted" style={{ marginTop: 8 }}>
               Please sign in to view and redeem coupons.
@@ -258,31 +252,19 @@ export default function CouponsPage() {
       <Style />
 
       <div className="wrap">
-        <div className="tabs">
-          <Link href="/" className="tab">Deals</Link>
-          <Link href="/coupon" className="tab tabActive">Coupons</Link>
-          <Link href="/member" className="tab">Points</Link>
-        </div>
+        <TopNav />
 
-        <div className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-            <div>
-              <div className="title">Coupons</div>
-              <div className="muted" style={{ marginTop: 6 }}>
-                Tap Redeem to show the barcode at checkout.
-              </div>
-            </div>
-            <button className="btn btnSoft" onClick={load}>Refresh</button>
+        {status ? (
+          <div style={{ marginTop: 10, fontWeight: 850, color: "#0a2a7a", textAlign: "center" }}>
+            {status}
           </div>
+        ) : null}
 
-          {status ? (
-            <div style={{ marginTop: 10, fontWeight: 850, color: "#0a2a7a" }}>{status}</div>
-          ) : null}
-
-          {emptyText && !status ? (
-            <div className="muted" style={{ marginTop: 14 }}>{emptyText}</div>
-          ) : null}
-        </div>
+        {emptyText && !status ? (
+          <div className="muted" style={{ marginTop: 14, textAlign: "center" }}>
+            {emptyText}
+          </div>
+        ) : null}
 
         <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
           {rows.map((c) => (
@@ -294,6 +276,7 @@ export default function CouponsPage() {
                     src={c.image_url}
                     alt={c.name}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    draggable={false}
                   />
                 ) : (
                   <div style={{ width: "100%", height: "100%", background: "rgba(29,78,216,0.08)" }} />
@@ -349,13 +332,6 @@ function Style() {
       * { -webkit-tap-highlight-color: transparent; }
       a { color: inherit; }
       .wrap { max-width: 560px; margin: 0 auto; }
-
-      .tabs {
-        display: flex; justify-content: center; gap: 44px;
-        font-weight: 950; margin-bottom: 14px;
-      }
-      .tab { text-decoration: none; color: #94a3b8; padding-bottom: 6px; }
-      .tabActive { color: #1d4ed8; border-bottom: 3px solid #1d4ed8; }
 
       .card {
         background: #fff;
