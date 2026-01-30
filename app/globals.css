@@ -20,7 +20,7 @@ html, body{
   -webkit-overflow-scrolling: touch;
 }
 
-/* ✅ Normal font back (no weird override) */
+/* ✅ Normal font back */
 body{
   margin:0;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
@@ -31,12 +31,11 @@ body{
   touch-action: pan-y; /* vertical scroll everywhere */
 }
 
-/* ✅ Images should NEVER steal touch/scroll */
+/* ✅ Images should NOT steal touch/scroll, but allow tapping on cards */
 img{
   -webkit-user-drag: none;
   user-select: none;
   -webkit-touch-callout: none;
-  pointer-events: none;
 }
 
 /* common UI */
@@ -51,7 +50,7 @@ img{
   background: var(--card);
   border:1px solid var(--border);
   border-radius:18px;
-  box-shadow: 0 10px 30px rgba(2,6,23,.06);
+  box-shadow: none;
 }
 
 .btn{
@@ -100,7 +99,9 @@ img{
   padding:16px;
 }
 
-/* ===== Carousel / swipe rows (THIS is the fix) ===== */
+/* =========================================================
+   ✅ CAROUSEL (Horizontal rows) — smooth + consistent sizing
+   ========================================================= */
 .swipeRow, .hscroll{
   display: flex;
   gap: 12px;
@@ -109,43 +110,51 @@ img{
   padding: 2px 2px 12px;
   -webkit-overflow-scrolling: touch;
 
-  /* ✅ makes it feel like a smooth carousel */
+  /* smooth, non-snap carousel */
   scroll-snap-type: none;
   scroll-behavior: smooth;
 
-  /* ✅ IMPORTANT: horizontal pan only inside row */
+  /* only horizontal gesture inside the row */
   touch-action: pan-x;
 
-  /* hide scrollbar */
   scrollbar-width: none;
 }
 .swipeRow::-webkit-scrollbar,
 .hscroll::-webkit-scrollbar{ display:none; }
 
-/* Cards inside carousel */
-/* ===== Deal cards (uniform + bigger) ===== */
-/* ===== Flat, clean deal cards (no shadow) ===== */
+/* end cap makes it easy to scroll fully */
+.swipeEndCap{ width: 10px; flex: 0 0 auto; }
+
+/* =========================================================
+   ✅ DEAL CARDS — uniform size everywhere
+   ========================================================= */
 .dealCard,
-.dealCardCompact {
+.dealCardCompact{
   flex: 0 0 auto;
-
-  /* uniform size for all deals */
-  width: min(360px, 88vw);
-
-  border-radius: 24px;
-
-  /* very light, thin border */
-  border: 1px solid rgba(15, 23, 42, 0.08);
-
+  width: min(340px, 86vw);          /* ✅ same size in every row */
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08); /* ✅ thinner border */
   background: #ffffff;
   overflow: hidden;
   display: grid;
-
-  /* REMOVE shadow completely */
-  box-shadow: none;
+  box-shadow: none;                 /* ✅ no shadow */
 }
 
-.dealImgCompact{ height: 140px; }
+/* ✅ IMPORTANT: define the image properly so it fits */
+.dealImg,
+.dealImgCompact{
+  width: 100%;
+  height: 170px;                    /* ✅ consistent height */
+  object-fit: cover;                /* ✅ photo fits */
+  display: block;
+  background: #eaf1ff;
+}
+
+/* If you want compact rows later, just reduce height:
+   .dealImgCompact { height: 150px; }
+   but right now you want them all same size.
+*/
+.dealImgCompact{ height: 170px; }   /* ✅ force same height */
 
 .dealBody{ padding: 14px; display: grid; gap: 7px; }
 
@@ -168,10 +177,22 @@ img{
   margin-top: 2px;
 }
 
-/* end cap makes it easy to scroll all the way */
-.swipeEndCap{ width: 6px; flex: 0 0 auto; }
+/* =========================================================
+   ✅ KEEP vertical scroll working even over the carousel/cards
+   ========================================================= */
+/* Let the browser decide whether the gesture is vertical or horizontal */
+.swipeRow, .hscroll{
+  touch-action: pan-x; /* keep horizontal feel */
+}
 
-/* ===== Kiosk styles stay as you had them ===== */
+/* On iOS, images can sometimes “grab” touch — disable on images only */
+.dealImg, .dealImgCompact{
+  pointer-events: none;
+}
+
+/* =========================================================
+   Kiosk styles (unchanged)
+   ========================================================= */
 .kioskRoot { height: 100vh; width: 100vw; overflow: hidden; background: #f3f7ff; }
 .kioskWrap { height: 100%; width: 100%; display: flex; flex-direction: column; padding: 14px; box-sizing: border-box; }
 .kioskTopbar {
@@ -201,18 +222,3 @@ img{
 }
 .kioskBtn.primary { background: #1d4ed8; color: #fff; }
 .kioskBtn.danger { background: #fee2e2; color: #991b1b; }
-
-/* ✅ Allow page to scroll vertically even when finger is on a deal card */
-.swipeRow,
-.hscroll {
-  touch-action: auto !important;       /* was pan-x */
-  overscroll-behavior-x: contain;      /* helps prevent back/forward hijack */
-}
-
-/* ✅ Make sure the cards themselves don’t “capture” the touch */
-.dealCard,
-.dealBody {
-  pointer-events: none;
-}
-
-/* images already had pointer-events:none, keep it */
