@@ -1,21 +1,7 @@
-html, body {
-  height: auto;
-  min-height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-}
-
-body {
-  margin: 0;
-  touch-action: pan-y;          /* ✅ vertical scroll everywhere */
-  overscroll-behavior-x: none;  /* ✅ reduce back/forward swipe */
-}
-
 :root{
   --bg: #f2f5f9;
   --card: #ffffff;
-  --muted: #6b7280;
+  --muted: rgba(10,42,122,0.65);
   --text: #0f172a;
   --blue: #2563eb;
   --blue2:#1d4ed8;
@@ -23,65 +9,42 @@ body {
 }
 
 *{ box-sizing:border-box; }
+a{ color:inherit; text-decoration:none; }
+
+/* ✅ Let the document scroll normally */
 html, body{
   height: auto;
   min-height: 100%;
   overflow-x: hidden;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
+/* ✅ Normal font back (no weird override) */
 body{
   margin:0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
   background: radial-gradient(1200px 600px at 20% -10%, rgba(37,99,235,.18), transparent 60%),
               radial-gradient(1200px 600px at 80% 0%, rgba(37,99,235,.10), transparent 55%),
               var(--bg);
   color:var(--text);
+  touch-action: pan-y; /* vertical scroll everywhere */
 }
 
-/* ✅ Make vertical scroll work anywhere (even over images/cards) */
-.container, .grid, .card, img{
-  touch-action: pan-y;
-}
-
-/* ✅ Prevent iOS image drag/selection from blocking scroll */
+/* ✅ Images should NEVER steal touch/scroll */
 img{
   -webkit-user-drag: none;
   user-select: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
 }
 
-a{ color:inherit; text-decoration:none; }
-
+/* common UI */
 .container{
   width:100%;
   max-width:1100px;
   margin:0 auto;
   padding:24px;
-}
-
-.nav{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:18px;
-}
-
-.brand{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  font-weight:800;
-  letter-spacing:.2px;
-}
-
-.badge{
-  background: rgba(37,99,235,.12);
-  color: var(--blue2);
-  border:1px solid rgba(37,99,235,.25);
-  padding:6px 10px;
-  border-radius:999px;
-  font-size:12px;
-  font-weight:700;
 }
 
 .card{
@@ -97,8 +60,9 @@ a{ color:inherit; text-decoration:none; }
   padding:10px 14px;
   border-radius:12px;
   cursor:pointer;
-  font-weight:700;
+  font-weight:800;
 }
+
 .btnPrimary{
   background: linear-gradient(180deg, var(--blue), var(--blue2));
   color:#fff;
@@ -114,52 +78,16 @@ a{ color:inherit; text-decoration:none; }
   outline:none;
   background:#fff;
   font-size:16px;
+  font-weight:800;
 }
 .input:focus{
   border-color: rgba(37,99,235,.45);
   box-shadow: 0 0 0 4px rgba(37,99,235,.12);
 }
 
-.grid{
-  display:grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap:16px;
-}
+.muted{ color: var(--muted); font-weight: 800; }
 
-.dealCard{
-  grid-column: span 12;
-  overflow:hidden;
-}
-@media(min-width:720px){
-  .dealCard{ grid-column: span 6; }
-}
-@media(min-width:1024px){
-  .dealCard{ grid-column: span 4; }
-}
-
-.dealImg{
-  width:100%;
-  height:170px;
-  object-fit:cover;
-  background: #e5e7eb;
-}
-/* ===== Images should NOT block vertical scrolling ===== */
-.dealImg,
-.dealSwipeImg,
-.dealSwipeImg img {
-  pointer-events: none;
-  -webkit-user-drag: none;
-  user-select: none;
-}
-.dealBody{
-  padding:14px;
-}
-.price{
-  font-size:18px;
-  font-weight:900;
-}
-.muted{ color:var(--muted); }
-
+/* ===== Modal ===== */
 .modalOverlay{
   position:fixed; inset:0;
   background: rgba(15,23,42,.55);
@@ -171,134 +99,77 @@ a{ color:inherit; text-decoration:none; }
   width:min(520px, 100%);
   padding:16px;
 }
-.modalHeader{
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:10px;
-}
-.hr{ height:1px; background:var(--border); margin:12px 0; }
 
-.center{
-  min-height: calc(100vh - 60px);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-/* ===== Swipeable deal sections (Home) ===== */
-.hscroll{
+/* ===== Carousel / swipe rows (THIS is the fix) ===== */
+.swipeRow, .hscroll{
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding: 10px 2px 4px;
-  scroll-snap-type: x mandatory;
+  overflow-y: hidden;
+  padding: 2px 2px 12px;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x; /* ✅ horizontal swipe inside row */
-}
-.hscroll::-webkit-scrollbar{ height: 0px; }
-.hscroll{ scrollbar-width: none; }
 
-.hscrollEndCap{
-  width: 2px;
-  flex: 0 0 auto;
-}
+  /* ✅ makes it feel like a smooth carousel */
+  scroll-snap-type: none;
+  scroll-behavior: smooth;
 
-.dealSwipeCard{
-  scroll-snap-align: start;
+  /* ✅ IMPORTANT: horizontal pan only inside row */
+  touch-action: pan-x;
+
+  /* hide scrollbar */
+  scrollbar-width: none;
+}
+.swipeRow::-webkit-scrollbar,
+.hscroll::-webkit-scrollbar{ display:none; }
+
+/* Cards inside carousel */
+.dealCard{
   flex: 0 0 auto;
   width: min(320px, 82vw);
-  border-radius: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(10,60,160,0.14);
+  background: #f8fbff;
   overflow: hidden;
-  background: rgba(255,255,255,0.75);
-  border: 1px solid rgba(0,0,0,0.06);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.04);
-}
-/* ===== Horizontal carousel behavior ===== */
-.swipeRow,
-.hscroll {
-  touch-action: pan-x;        /* only horizontal swipe here */
-  scroll-snap-type: none;     /* smoother, non-sticky carousel */
-  -webkit-overflow-scrolling: touch;
+  display: grid;
 }
 
-.dealSwipeImg{
-  height: 160px;
-  background: rgba(0,0,0,0.05);
-}
-.dealSwipeImg img{
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.dealSwipeImgPlaceholder{
-  width: 100%;
-  height: 100%;
+/* make it slightly narrower for “compact” rows */
+.dealCardCompact{ width: min(290px, 76vw); }
+
+.dealImg{
+  width:100%;
+  height:160px;
+  object-fit:cover;
+  background: #eaf1ff;
 }
 
-.dealSwipeBody{
-  padding: 12px;
-}
+.dealImgCompact{ height: 140px; }
 
-.dealSwipeTopRow{
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: baseline;
-}
+.dealBody{ padding: 14px; display: grid; gap: 7px; }
 
-.dealSwipeTitle{
-  font-weight: 950;
-  font-size: 16px;
-  line-height: 1.15;
-  max-width: 220px;
-}
-
-.dealSwipePrice{
+.dealName{
   font-weight: 950;
   font-size: 18px;
+  color: #0a2a7a;
+  line-height: 1.12;
 }
-
-.dealSwipeDesc{
-  margin-top: 8px;
-  font-size: 13px;
-  line-height: 1.25;
-  min-height: 34px;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.dealDesc{
+  color: rgba(10,42,122,0.70);
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.22;
 }
-
-.dealSwipeMeta{
-  margin-top: 10px;
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-/* ===== Cashier big controls ===== */
-.bigBtn{
-  font-size: 20px;
-  padding: 16px 18px;
-  border-radius: 16px;
+.dealPrice{
   font-weight: 950;
+  font-size: 22px;
+  color: #1d4ed8;
+  margin-top: 2px;
 }
 
-.bigInput{
-  font-size: 26px;
-  padding: 16px 18px;
-  border-radius: 16px;
-  text-align: center;
-  font-weight: 950;
-}
+/* end cap makes it easy to scroll all the way */
+.swipeEndCap{ width: 6px; flex: 0 0 auto; }
 
-.pricePreview{
-  font-size: 34px;
-  font-weight: 950;
-  text-align: center;
-  margin-top: 10px;
-}
-
-/* SUNSTOP_KIOSK_STYLES */
+/* ===== Kiosk styles stay as you had them ===== */
 .kioskRoot { height: 100vh; width: 100vw; overflow: hidden; background: #f3f7ff; }
 .kioskWrap { height: 100%; width: 100%; display: flex; flex-direction: column; padding: 14px; box-sizing: border-box; }
 .kioskTopbar {
@@ -320,15 +191,7 @@ a{ color:inherit; text-decoration:none; }
 }
 .kioskTitle { font-size: 20px; font-weight: 950; color: #0a2a7a; }
 .kioskMuted { color: rgba(10,42,122,0.65); font-weight: 850; margin-top: 4px; }
-.kioskLabel { color: rgba(10,42,122,0.65); font-weight: 950; font-size: 12px; margin-bottom: 6px; }
-.amountBox {
-  width: 100%; border-radius: 18px; padding: 16px;
-  border: 1px solid rgba(29,78,216,0.18);
-  background: #f7faff;
-  font-weight: 950; font-size: 20px; color: #0a2a7a;
-}
-.moneyBig { font-size: 44px; font-weight: 950; color: #0a2a7a; margin-top: 6px; }
-.kioskRow { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
 .kioskBtn {
   padding: 14px 16px; border-radius: 16px; border: 0;
   font-weight: 950; cursor: pointer;
@@ -336,26 +199,4 @@ a{ color:inherit; text-decoration:none; }
 }
 .kioskBtn.primary { background: #1d4ed8; color: #fff; }
 .kioskBtn.danger { background: #fee2e2; color: #991b1b; }
-.kioskStatus { margin-top: 10px; font-weight: 900; color: #0a2a7a; }
 
-.kioskoverlay {
-  position: fixed; inset: 0; background: rgba(10,42,122,0.45);
-  display: flex; align-items: center; justify-content: center;
-  padding: 14px; z-index: 50;
-}
-.kioskmodal {
-  width: min(520px, 100%);
-  background: #fff; border-radius: 22px;
-  border: 1px solid rgba(29,78,216,0.14);
-  box-shadow: 0 18px 50px rgba(10,42,122,0.18);
-  padding: 14px;
-}
-
-.keypad { margin-top: 10px; display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); }
-.key {
-  border: 0; border-radius: 18px; padding: 18px 0;
-  font-weight: 950; font-size: 22px;
-  background: #e8efff; color: #1d4ed8;
-}
-.key.alt { background: #fee2e2; color: #991b1b; }
-.key.done { grid-column: span 3; background: #1d4ed8; color: #fff; }

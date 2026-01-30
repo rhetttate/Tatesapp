@@ -37,7 +37,6 @@ function titleDept(s: string) {
     .join(" ");
 }
 
-// Horizontal swipe row
 function SwipeRow({
   title,
   deals,
@@ -48,16 +47,13 @@ function SwipeRow({
   compact?: boolean;
 }) {
   const rowRef = useRef<HTMLDivElement | null>(null);
-
   if (!deals.length) return null;
 
   return (
-    <div className="section">
-      <div className="sectionHead">
-        <div className="sectionTitle">{title}</div>
-        <div className="muted" style={{ fontSize: 12 }}>
-          Swipe →
-        </div>
+    <div style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "0 2px" }}>
+        <div style={{ fontWeight: 950, color: "#0a2a7a", fontSize: 16 }}>{title}</div>
+        <div className="muted" style={{ fontSize: 12 }}>Swipe →</div>
       </div>
 
       <div ref={rowRef} className="swipeRow" aria-label={title}>
@@ -68,7 +64,6 @@ function SwipeRow({
                 className={"dealImg " + (compact ? "dealImgCompact" : "")}
                 src={d.image_url}
                 alt={String(d.name ?? "Deal")}
-                draggable={false}
               />
             ) : (
               <div className={"dealImg " + (compact ? "dealImgCompact" : "")} />
@@ -92,9 +87,6 @@ export default function DealsHomePage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
 
-  // ✅ 0 = no auto refresh
-  const AUTO_REFRESH_MS = 0;
-
   async function loadDeals() {
     setStatus("");
     try {
@@ -117,11 +109,6 @@ export default function DealsHomePage() {
 
   useEffect(() => {
     loadDeals();
-
-    if (AUTO_REFRESH_MS > 0) {
-      const t = setInterval(loadDeals, AUTO_REFRESH_MS);
-      return () => clearInterval(t);
-    }
   }, []);
 
   const featured = useMemo(() => deals.filter((d) => !!d.featured), [deals]);
@@ -140,220 +127,49 @@ export default function DealsHomePage() {
   }, [deals]);
 
   return (
-    <div className="page">
-      <style jsx global>{`
-        * {
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        /* ✅ Make page scrolling explicit */
-
-        .wrap {
-          max-width: 980px;
-          margin: 0 auto;
-          padding: 14px 18px 26px;
-        }
-
-        /* ✅ Full-width logo bar above tabs */
-        .logoBar {
-          width: 100%;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          padding: 10px 0 6px;
-        }
-
-        .logoBox {
-          width: 100%;
-          border-radius: 18px;
-          border: 1px solid rgba(29, 78, 216, 0.14);
-          background: rgba(255, 255, 255, 0.75);
-          box-shadow: 0 8px 24px rgba(10, 42, 122, 0.06);
-          padding: 12px 14px;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-
-        /* Put your logo in /public/logo.png and it will show */
-        .logoImg {
-          max-width: 100%;
-          height: 54px;
-          object-fit: contain;
-          display: block;
-        }
-
-        .tabs {
-          display: flex;
-          justify-content: center;
-          gap: 44px;
-          font-weight: 950;
-          margin: 10px 0 14px;
-        }
-        .tab {
-          text-decoration: none;
-          color: #94a3b8;
-          padding-bottom: 6px;
-        }
-        .tabActive {
-          color: #1d4ed8;
-          border-bottom: 3px solid #1d4ed8;
-        }
-
-        /* ✅ No top header card anymore — content just flows */
-        .statusLine {
-          margin-top: 6px;
-          color: rgba(10, 42, 122, 0.65);
-          font-weight: 850;
-          font-size: 13px;
-          text-align: center;
-        }
-
-        .section {
-          margin-top: 16px;
-        }
-
-        .sectionHead {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 0 2px;
-        }
-
-        .sectionTitle {
-          font-weight: 950;
-          color: #0a2a7a;
-          font-size: 16px;
-        }
-
-        .muted {
-          color: rgba(10, 42, 122, 0.65);
-          font-weight: 800;
-        }
-
-        /* ✅ Swipe row: only horizontal pan inside this row */
-        .swipeRow{
-        margin-top: 10px;
-        display: flex;
-        gap: 12px;
-        overflow-x: auto;
-        padding: 2px 2px 10px;
-
-        -webkit-overflow-scrolling: touch;
-        scroll-behavior: smooth;
-
-        /* carousel feel (not sticky snap) */
-        scroll-snap-type: none;
-
-        /* allow easy horizontal swipes INSIDE row */
-        touch-action: pan-x;
-
-        scrollbar-width: none;
-        }
-        .swipeRow::-webkit-scrollbar{ display:none; }
-          display: none;
-        }
-        .swipeEndCap {
-          width: 2px;
-          flex: 0 0 auto;
-        }
-
-        .dealCard {
-          flex: 0 0 auto;
-          width: 300px;
-          scroll-snap-align: start;
-
-          border-radius: 22px;
-          border: 1px solid rgba(10, 60, 160, 0.14);
-          background: #f8fbff;
-          display: grid;
-          overflow: hidden;
-
-          /* ✅ Let vertical scroll work even when finger is on cards */
-          touch-action: pan-y;
-        }
-        .dealCardCompact {
-          width: 270px;
-        }
-
-        .dealImg{
-        pointer-events: none;
-        user-select: none;
-        -webkit-user-drag: none;
-       }
-
-
-          /* ✅ Important: don’t block vertical scroll on iOS */
-          pointer-events: none;
-          user-select: none;
-          -webkit-user-drag: none;
-        }
-        .dealImgCompact {
-          height: 140px;
-        }
-
-        .dealBody {
-          padding: 14px;
-          display: grid;
-          gap: 7px;
-        }
-        .dealName {
-          font-weight: 950;
-          font-size: 18px;
-          color: #0a2a7a;
-          line-height: 1.12;
-        }
-        .dealDesc {
-          color: rgba(10, 42, 122, 0.7);
-          font-weight: 800;
-          font-size: 14px;
-          line-height: 1.22;
-        }
-        .dealPrice {
-          font-weight: 950;
-          font-size: 22px;
-          color: #1d4ed8;
-          margin-top: 2px;
-        }
-
-        @media (max-width: 420px) {
-          .dealCard {
-            width: 86vw;
-          }
-          .logoImg {
-            height: 46px;
-          }
-        }
-      `}</style>
-
-      <div className="wrap">
-        {/* ✅ Logo spot ABOVE tabs */}
-        <div className="logoBar">
-          <div className="logoBox">
-            {/* Put a file at /public/logo.png (or change the src here) */}
-            <img className="logoImg" src="tatessign.png" />
+    <div style={{ minHeight: "100vh", padding: 18 }}>
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "14px 18px 26px" }}>
+        {/* LOGO BAR */}
+        <div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "center", padding: "10px 0 6px" }}>
+          <div
+            style={{
+              width: "100%",
+              borderRadius: 18,
+              border: "1px solid rgba(29, 78, 216, 0.14)",
+              background: "rgba(255, 255, 255, 0.75)",
+              boxShadow: "0 8px 24px rgba(10, 42, 122, 0.06)",
+              padding: "12px 14px",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            {/* Put your logo in /public/tatessign.png */}
+            <img src="/tatessign.png" alt="Tate's" style={{ pointerEvents: "none", height: 54, maxWidth: "100%", objectFit: "contain" }} />
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="tabs">
-          <Link href="/" className={"tab tabActive"}>
+        {/* TABS */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 44, fontWeight: 950, margin: "10px 0 14px" }}>
+          <Link href="/" style={{ color: "#1d4ed8", borderBottom: "3px solid #1d4ed8", paddingBottom: 6 }}>
             Deals
           </Link>
-          <Link href="/coupon" className="tab">
+          <Link href="/coupon" style={{ color: "#94a3b8", paddingBottom: 6 }}>
             Coupons
           </Link>
-          <Link href="/member" className="tab">
+          <Link href="/member" style={{ color: "#94a3b8", paddingBottom: 6 }}>
             Points
           </Link>
         </div>
 
-        {/* optional tiny status line */}
-        {status ? <div className="statusLine">{status}</div> : null}
-        {!status && loading ? <div className="statusLine">Loading…</div> : null}
+        {/* tiny status line only */}
+        {status ? (
+          <div className="muted" style={{ fontSize: 13, textAlign: "center" }}>{status}</div>
+        ) : loading ? (
+          <div className="muted" style={{ fontSize: 13, textAlign: "center" }}>Loading…</div>
+        ) : null}
 
-        {/* content */}
+        {/* DEALS */}
         {featured.length > 0 ? <SwipeRow title="Top Deals" deals={featured} /> : null}
 
         {byDept.length > 0 ? (
@@ -363,7 +179,7 @@ export default function DealsHomePage() {
             ))}
           </>
         ) : (
-          !loading && <div className="statusLine">No deals yet.</div>
+          !loading && <div className="muted" style={{ marginTop: 14, textAlign: "center" }}>No deals yet.</div>
         )}
       </div>
     </div>
