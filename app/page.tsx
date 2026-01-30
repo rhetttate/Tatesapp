@@ -146,15 +146,10 @@ export default function DealsHomePage() {
           >
             {/* Put your logo in /public/tatessign.png */}
             <img
-            src="/logo.png"
-            alt="Tate’s Supermarket"
-            style={{
-              height: 60,
-              maxWidth: "100%",
-              objectFit: "contain",
-              pointerEvents: "none",
-            }}
-             />
+            className="logoImg"
+            src="/tatessing.png"
+            alt="Tate's Supermarket"
+          />
 
           </div>
         </div>
