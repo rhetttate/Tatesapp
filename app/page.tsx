@@ -147,12 +147,6 @@ export default function DealsHomePage() {
         }
 
         /* ✅ Make page scrolling explicit */
-        .page {
-          min-height: 100vh;
-          background: #f3f7ff;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-        }
 
         .wrap {
           max-width: 980px;
@@ -239,21 +233,25 @@ export default function DealsHomePage() {
         }
 
         /* ✅ Swipe row: only horizontal pan inside this row */
-        .swipeRow {
-          margin-top: 10px;
-          display: flex;
-          gap: 12px;
-          overflow-x: auto;
-          overflow-y: visible;
-          padding: 2px 2px 8px;
+        .swipeRow{
+        margin-top: 10px;
+        display: flex;
+        gap: 12px;
+        overflow-x: auto;
+        padding: 2px 2px 10px;
 
-          scroll-snap-type: x mandatory;
-          -webkit-overflow-scrolling: touch;
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
 
-          touch-action: pan-x; /* horizontal only */
-          scrollbar-width: none;
+        /* carousel feel (not sticky snap) */
+        scroll-snap-type: none;
+
+        /* allow easy horizontal swipes INSIDE row */
+        touch-action: pan-x;
+
+        scrollbar-width: none;
         }
-        .swipeRow::-webkit-scrollbar {
+        .swipeRow::-webkit-scrollbar{ display:none; }
           display: none;
         }
         .swipeEndCap {
@@ -279,11 +277,12 @@ export default function DealsHomePage() {
           width: 270px;
         }
 
-        .dealImg {
-          width: 100%;
-          height: 160px;
-          object-fit: cover;
-          background: #eaf1ff;
+        .dealImg{
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-drag: none;
+       }
+
 
           /* ✅ Important: don’t block vertical scroll on iOS */
           pointer-events: none;

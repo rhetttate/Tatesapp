@@ -1,3 +1,17 @@
+html, body {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+body {
+  margin: 0;
+  touch-action: pan-y;          /* ✅ vertical scroll everywhere */
+  overscroll-behavior-x: none;  /* ✅ reduce back/forward swipe */
+}
+
 :root{
   --bg: #f2f5f9;
   --card: #ffffff;
@@ -13,7 +27,6 @@ html, body{
   height: auto;
   min-height: 100%;
   overflow-x: hidden;
-  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -130,6 +143,14 @@ a{ color:inherit; text-decoration:none; }
   object-fit:cover;
   background: #e5e7eb;
 }
+/* ===== Images should NOT block vertical scrolling ===== */
+.dealImg,
+.dealSwipeImg,
+.dealSwipeImg img {
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
 .dealBody{
   padding:14px;
 }
@@ -190,6 +211,13 @@ a{ color:inherit; text-decoration:none; }
   background: rgba(255,255,255,0.75);
   border: 1px solid rgba(0,0,0,0.06);
   box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+}
+/* ===== Horizontal carousel behavior ===== */
+.swipeRow,
+.hscroll {
+  touch-action: pan-x;        /* only horizontal swipe here */
+  scroll-snap-type: none;     /* smoother, non-sticky carousel */
+  -webkit-overflow-scrolling: touch;
 }
 
 .dealSwipeImg{
