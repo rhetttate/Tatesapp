@@ -45,8 +45,21 @@ export default function ContactClient() {
   return (
     <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
       <style jsx global>{`
+              @media (max-width: 480px) {
+          .wrap {
+            padding: 8px 6px 22px;
+          }
+        }
+
         * { -webkit-tap-highlight-color: transparent; }
-        .wrap { max-width: 560px; margin: 0 auto; }
+        .wrap {
+          max-width: 1100px;     /* keep desktop nice */
+          margin: 0 auto;
+
+          /* 🔽 smaller side padding */
+          padding: 10px 10px 24px;
+        }
+
         .card {
           background: #fff; border-radius: 22px; padding: 18px;
           border: 1px solid rgba(29,78,216,0.14);
