@@ -266,6 +266,13 @@ img{
   user-select: none;
 }
 
+.logoImg {
+  height: 48px;        /* ✅ controls size */
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 /* ✅ Bleed images past the side padding ("off screen" look) */
 .dealImg,
 .dealImgCompact {

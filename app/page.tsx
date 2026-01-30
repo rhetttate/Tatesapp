@@ -144,12 +144,12 @@ export default function DealsHomePage() {
               alignItems: "center",
             }}
           >
-            {/* Put your logo in /public/tatessign.png */}
-            <img
+           <img
+            src="/tatessign.png"
+            alt="Tate’s Supermarket"
             className="logoImg"
-            src="/tatessing.png"
-            alt="Tate's Supermarket"
           />
+
 
           </div>
         </div>
