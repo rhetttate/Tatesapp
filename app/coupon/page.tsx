@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import TopNav from "../components/topnav";
+import TopNav from "../components/TopNav";
 
 function digitsOnly(s: string) {
   return (s || "").replace(/\D/g, "");
