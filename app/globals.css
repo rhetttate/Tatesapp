@@ -123,18 +123,26 @@ img{
 .hscroll::-webkit-scrollbar{ display:none; }
 
 /* Cards inside carousel */
-.dealCard{
+/* ===== Deal cards (uniform + bigger) ===== */
+.dealCard,
+.dealCardCompact {
   flex: 0 0 auto;
-  width: min(320px, 82vw);
-  border-radius: 22px;
-  border: 1px solid rgba(10,60,160,0.14);
-  background: #f8fbff;
+
+  /* SAME size for all cards */
+  width: min(360px, 88vw);
+
+  border-radius: 26px;
+
+  /* much softer border */
+  border: 1px solid rgba(10, 60, 160, 0.06);
+
+  background: #ffffff;
   overflow: hidden;
   display: grid;
-}
 
-/* make it slightly narrower for “compact” rows */
-.dealCardCompact{ width: min(290px, 76vw); }
+  /* subtle depth instead of heavy border */
+  box-shadow: 0 12px 30px rgba(10, 42, 122, 0.10);
+}
 
 .dealImg{
   width:100%;

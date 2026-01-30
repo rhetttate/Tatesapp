@@ -593,10 +593,6 @@ export default function CashierPage() {
         .keyAlt { background: rgba(29,78,216,0.08); }
         .keyDone { background: #1d4ed8; color: #fff; border-color: #1d4ed8; grid-column: 1 / -1; }
 
-        @media (max-width: 900px) {
-          .grid2 { grid-template-columns: 1fr; }
-          .saleGrid { grid-template-columns: repeat(2, 1fr); }
-        }
       `}</style>
 
       <div className="topBar">
