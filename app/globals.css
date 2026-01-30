@@ -141,14 +141,15 @@ img{
 }
 
 /* ✅ IMPORTANT: define the image properly so it fits */
+/* ✅ Make images bleed past the side padding ("off the screen" look) */
 .dealImg,
 .dealImgCompact{
-  width: 100%;
-  height: 170px;                    /* ✅ consistent height */
-  object-fit: cover;                /* ✅ photo fits */
-  display: block;
-  background: #eaf1ff;
+  width: calc(100% + 36px);   /* 18px left + 18px right */
+  margin-left: -18px;
+  margin-right: -18px;
+  border-radius: 0;
 }
+
 
 /* If you want compact rows later, just reduce height:
    .dealImgCompact { height: 150px; }
@@ -222,3 +223,15 @@ img{
 }
 .kioskBtn.primary { background: #1d4ed8; color: #fff; }
 .kioskBtn.danger { background: #fee2e2; color: #991b1b; }
+
+/* ✅ Scroll works even when touching a deal card */
+.dealCard,
+.dealBody{
+  touch-action: pan-y;
+}
+
+/* ✅ Carousel still swipes sideways, but allows vertical scroll to win when you scroll */
+.swipeRow,
+.hscroll{
+  touch-action: pan-x pan-y;
+}
