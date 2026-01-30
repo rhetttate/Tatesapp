@@ -23,7 +23,7 @@ export default function TopNav() {
         <Link href="/" className={tabClass("/")}>
           Deals
         </Link>
-        <Link href="/coupon" className={tabClass("/coupon")}>
+        <Link href="/coupons" className={tabClass("/coupon")}>
           Coupons
         </Link>
         <Link href="/member" className={tabClass("/member")}>
