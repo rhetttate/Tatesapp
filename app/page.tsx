@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
-import TopNav from "./components/topnav";
 
 
 type DealRow = {

@@ -5,7 +5,6 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import TopNav from "../components/TopNav";
 
 function digitsOnly(s: string) {
   return (s || "").replace(/\D/g, "");
@@ -213,7 +212,7 @@ export default function CouponsPage() {
     return (
       <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
         <div className="wrap">
-          <TopNav />
+        
           <div className="muted" style={{ marginTop: 10, textAlign: "center" }}>Loading…</div>
         </div>
         <Style />
@@ -225,7 +224,7 @@ export default function CouponsPage() {
     return (
       <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
         <div className="wrap">
-          <TopNav />
+        
           <div className="card" style={{ marginTop: 12 }}>
             <div className="title">Coupons</div>
             <div className="muted" style={{ marginTop: 8 }}>
@@ -252,7 +251,7 @@ export default function CouponsPage() {
       <Style />
 
       <div className="wrap">
-        <TopNav />
+        
 
         {status ? (
           <div style={{ marginTop: 10, fontWeight: 850, color: "#0a2a7a", textAlign: "center" }}>

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { supabase } from "../../lib/supabase";
-import TopNav from "../components/topnav";
 
 export default function MemberPage() {
   // auth
@@ -483,7 +482,7 @@ export default function MemberPage() {
       `}</style>
 
       <div className="wrap">
-        <TopNav />
+      
 
         {!authUid ? (
           <div className="card">
