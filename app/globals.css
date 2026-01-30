@@ -237,3 +237,42 @@ img{
 }
 .kioskBtn.primary { background: #1d4ed8; color: #fff; }
 .kioskBtn.danger { background: #fee2e2; color: #991b1b; }
+
+/* =========================================================
+   ✅ iOS FIX: Vertical scroll must work even when finger is on a card
+   We make the *cards* ignore touch so the browser scrolls the page.
+   The swipeRow still scrolls sideways.
+   ========================================================= */
+
+/* Let browser decide vertical vs horizontal */
+.swipeRow,
+.hscroll {
+  touch-action: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* The KEY: cards should NOT capture touch events */
+.dealCard,
+.dealCardCompact,
+.dealBody {
+  pointer-events: none !important;
+}
+
+/* Images also should not capture touches */
+.dealImg,
+.dealImgCompact {
+  pointer-events: none !important;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* ✅ Bleed images past the side padding ("off screen" look) */
+.dealImg,
+.dealImgCompact {
+  width: calc(100% + 36px) !important; /* assumes 18px page padding */
+  margin-left: -18px !important;
+  margin-right: -18px !important;
+  border-radius: 0 !important;
+  object-fit: cover !important;
+  display: block !important;
+}
