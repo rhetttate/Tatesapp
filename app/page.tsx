@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
-
+import TopNav from "./components/topnav";
 
 type DealRow = {
   id: string;
@@ -142,6 +142,7 @@ export default function DealsHomePage() {
   return (
     <div style={{ minHeight: "100vh", padding: 18 }}>
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "14px 18px 26px" }}>
+        <TopNav />
 
         {status ? (
           <div className="muted" style={{ fontSize: 13, textAlign: "center" }}>
