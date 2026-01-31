@@ -342,13 +342,10 @@ export default function MemberPage() {
     setRedeemStatus("");
     setResetBusy(true);
     try {
-      const em = (emailOverride ?? email).trim();
-      if (!em) throw new Error("Enter your email first.");
+      const site = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
+const redirectTo = `${site}/reset`;
 
-      const { error } = await supabase.auth.resetPasswordForEmail(em, {
-        redirectTo: `${window.location.origin}/reset`,
-      });
-      if (error) throw error;
+await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 
       setResetStatus("Reset email sent ✅ Check your inbox.");
     } catch (e: any) {
