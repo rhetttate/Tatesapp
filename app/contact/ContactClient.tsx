@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { supabase } from "../../lib/supabase";
 
 function digitsOnly(s: string) {
   return (s || "").replace(/\D/g, "");
@@ -15,6 +14,7 @@ export default function ContactClient() {
   const [smsOptIn, setSmsOptIn] = useState(false);
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
 
   async function submit() {
     setStatus("");
@@ -26,9 +26,27 @@ export default function ContactClient() {
     if (!hasEmail && !hasPhone) return setStatus("Please enter either an email or a phone number.");
     if (!message.trim()) return setStatus("Please enter a message.");
 
+    setBusy(true);
     try {
-      // If you later want to save contact submissions, we can add a table + insert here.
-      // For now, this validates the form per RingCentral + shows what you need.
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          smsOptIn,
+          message: message.trim(),
+          source: "contact-page",
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.ok) {
+        setStatus(data?.error ? `Error: ${data.error}` : "Error: Failed to send.");
+        return;
+      }
 
       setStatus("Submitted ✅ We’ll get back to you at support@tatessupermarket.com");
 
@@ -39,24 +57,22 @@ export default function ContactClient() {
       setMessage("");
     } catch (e: any) {
       setStatus("Error: " + (e?.message ?? String(e)));
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
       <style jsx global>{`
-              @media (max-width: 480px) {
-          .wrap {
-            padding: 8px 6px 22px;
-          }
+        @media (max-width: 480px) {
+          .wrap { padding: 8px 6px 22px; }
         }
 
         * { -webkit-tap-highlight-color: transparent; }
         .wrap {
-          max-width: 1100px;     /* keep desktop nice */
+          max-width: 1100px;
           margin: 0 auto;
-
-          /* 🔽 smaller side padding */
           padding: 10px 10px 24px;
         }
 
@@ -78,6 +94,7 @@ export default function ContactClient() {
           font-weight: 950; cursor: pointer;
         }
         .btnPrimary { background: #1d4ed8; color: #fff; }
+        .btnPrimary:disabled { opacity: 0.65; cursor: not-allowed; }
         .legalRow {
           display: flex; gap: 10px; margin-top: 14px; justify-content: space-between;
           font-weight: 850;
@@ -93,6 +110,7 @@ export default function ContactClient() {
           </div>
 
           <input className="input" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+
           <input
             className="input"
             placeholder="Email (optional)"
@@ -101,6 +119,7 @@ export default function ContactClient() {
             autoCapitalize="none"
             autoCorrect="off"
           />
+
           <input
             className="input"
             placeholder="Phone (optional)"
@@ -109,7 +128,6 @@ export default function ContactClient() {
             inputMode="tel"
           />
 
-          {/* RingCentral requirement: OPTIONAL checkbox ONLY for SMS consent */}
           <label style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "flex-start" }}>
             <input
               type="checkbox"
@@ -132,8 +150,8 @@ export default function ContactClient() {
           />
 
           <div className="btnRow">
-            <button className="btn btnPrimary" onClick={submit} style={{ flex: 1 }}>
-              Submit
+            <button className="btn btnPrimary" onClick={submit} disabled={busy} style={{ flex: 1 }}>
+              {busy ? "Sending..." : "Submit"}
             </button>
           </div>
 
@@ -148,3 +166,4 @@ export default function ContactClient() {
     </div>
   );
 }
+
