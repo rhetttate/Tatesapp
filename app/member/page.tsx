@@ -392,7 +392,7 @@ await supabase.auth.resetPasswordForEmail(email, { redirectTo });
         * { -webkit-tap-highlight-color: transparent; }
         .wrap { max-width: 560px; margin: 0 auto; }
         .card {
-          background: #fff; border-radius: 22px; padding: 18px;
+          background: #fff; border-radius: 10px; padding: 18px;
           border: 1px solid rgba(29,78,216,0.14);
           box-shadow: 0 8px 24px rgba(10,42,122,0.06);
         }
