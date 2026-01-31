@@ -345,7 +345,7 @@ export default function MemberPage() {
       const em = (emailOverride ?? email).trim();
       if (!em) throw new Error("Enter your email first.");
 
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(em, {
         redirectTo: `${window.location.origin}/reset`,
       });
       if (error) throw error;
