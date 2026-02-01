@@ -43,6 +43,7 @@ export async function POST(req: Request) {
     const phone = String(body?.phone || "").trim();
     const message = String(body?.message || "").trim();
     const smsOptIn = !!body?.smsOptIn;
+    const source = String(body?.source || "unknown").trim();
 
     const hasEmail = !!email && isEmail(email);
     const hasPhone = digitsOnly(phone).length >= 10;
@@ -53,6 +54,12 @@ export async function POST(req: Request) {
     if (!hasEmail && !hasPhone) {
       return NextResponse.json(
         { ok: false, error: "Please enter either a valid email or a phone number." },
+        { status: 400 }
+      );
+    }
+    if (smsOptIn && !hasPhone) {
+      return NextResponse.json(
+        { ok: false, error: "To opt into SMS, please enter a valid phone number." },
         { status: 400 }
       );
     }
@@ -71,8 +78,19 @@ export async function POST(req: Request) {
         <p><b>Email:</b> ${hasEmail ? escapeHtml(email) : "(none)"}</p>
         <p><b>Phone:</b> ${hasPhone ? escapeHtml(phone) : "(none)"}</p>
         <p><b>SMS Opt-In:</b> ${smsOptIn ? "YES" : "NO"}</p>
+        <p><b>Source:</b> ${escapeHtml(source)}</p>
+
         <hr />
+
         <p style="white-space: pre-wrap;"><b>Message:</b><br/>${escapeHtml(message)}</p>
+
+        <hr />
+
+        <p style="font-size:12px; color:#334155; line-height:1.4;">
+          SMS compliance note (for records): Consent is optional and not shared with third parties or affiliates.
+          If opted in, message frequency may vary; message &amp; data rates may apply; STOP to opt out; HELP for help.
+          Privacy + SMS terms: https://www.tatessupermarket.com/privacy
+        </p>
       </div>
     `;
 
@@ -92,10 +110,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message ?? String(e) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 });
   }
 }
 

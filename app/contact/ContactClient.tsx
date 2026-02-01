@@ -24,6 +24,7 @@ export default function ContactClient() {
 
     if (!name.trim()) return setStatus("Please enter your name.");
     if (!hasEmail && !hasPhone) return setStatus("Please enter either an email or a phone number.");
+    if (smsOptIn && !hasPhone) return setStatus("To opt into SMS, please enter a valid phone number.");
     if (!message.trim()) return setStatus("Please enter a message.");
 
     setBusy(true);
@@ -128,6 +129,7 @@ export default function ContactClient() {
             inputMode="tel"
           />
 
+          {/* ✅ RingCentral compliant SMS opt-in checkbox + language + links */}
           <label style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "flex-start" }}>
             <input
               type="checkbox"
@@ -135,9 +137,16 @@ export default function ContactClient() {
               onChange={(e) => setSmsOptIn(e.target.checked)}
               style={{ marginTop: 4 }}
             />
-            <span className="muted" style={{ fontSize: 13 }}>
-              Optional: I agree to receive SMS messages (promotional + informational). Message &amp; data rates may apply.
-              SMS consent is not shared with third parties.
+            <span className="muted" style={{ fontSize: 13, lineHeight: 1.35 }}>
+              Optional: I agree to receive SMS messages from Tate’s Supermarket (promotional and informational).
+              Message frequency may vary. Message &amp; data rates may apply. Reply <b>STOP</b> to opt out at any time.
+              Reply <b>HELP</b> for assistance or visit{" "}
+              <a href="https://www.tatessupermarket.com" target="_blank" rel="noreferrer">
+                https://www.tatessupermarket.com
+              </a>
+              . See{" "}
+              <Link href="/privacy">Privacy Policy</Link>{" "}
+              for privacy policy and SMS terms. SMS consent is not shared with third parties or affiliates.
             </span>
           </label>
 

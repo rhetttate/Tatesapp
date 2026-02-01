@@ -338,22 +338,26 @@ export default function MemberPage() {
   }
 
   async function sendReset(emailOverride?: string) {
-    setResetStatus("");
-    setRedeemStatus("");
-    setResetBusy(true);
-    try {
-      const site = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
-const redirectTo = `${site}/reset`;
+  setResetStatus("");
+  setRedeemStatus("");
+  setResetBusy(true);
+  try {
+    const em = (emailOverride ?? email).trim();
+    if (!em) throw new Error("Enter your email first.");
 
-await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
+    const redirectTo = `${site}/reset`;
 
-      setResetStatus("Reset email sent ✅ Check your inbox.");
-    } catch (e: any) {
-      setResetStatus("Reset error: " + (e?.message ?? String(e)));
-    } finally {
-      setResetBusy(false);
-    }
+    const { error } = await supabase.auth.resetPasswordForEmail(em, { redirectTo });
+    if (error) throw error;
+
+    setResetStatus("Reset email sent ✅ Check your inbox.");
+  } catch (e: any) {
+    setResetStatus("Reset error: " + (e?.message ?? String(e)));
+  } finally {
+    setResetBusy(false);
   }
+}
 
   // ----------------------------
   // Redeem request
@@ -392,7 +396,7 @@ await supabase.auth.resetPasswordForEmail(email, { redirectTo });
         * { -webkit-tap-highlight-color: transparent; }
         .wrap { max-width: 560px; margin: 0 auto; }
         .card {
-          background: #fff; border-radius: 10px; padding: 18px;
+          background: #fff; border-radius: 18px; padding: 18px;
           border: 1px solid rgba(29,78,216,0.14);
           box-shadow: 0 8px 24px rgba(10,42,122,0.06);
         }
@@ -654,9 +658,17 @@ await supabase.auth.resetPasswordForEmail(email, { redirectTo });
                 }}
                 style={{ marginTop: 4 }}
               />
-              <span className="muted" style={{ fontSize: 13 }}>
-                Optional: I agree to receive SMS messages (account + promos). Message &amp; data rates may apply.
-              </span>
+              <span className="muted" style={{ fontSize: 13, lineHeight: 1.35 }}>
+              Optional: I agree to receive SMS messages from Tate’s Supermarket (promotional and informational).
+              Message frequency may vary. Message &amp; data rates may apply. Reply <b>STOP</b> to opt out at any time.
+              Reply <b>HELP</b> for assistance or visit{" "}
+              <a href="https://www.tatessupermarket.com" target="_blank" rel="noreferrer">
+                https://www.tatessupermarket.com
+              </a>
+              . See <Link href="/privacy">Privacy Policy</Link> for privacy policy and SMS terms. SMS consent is not shared with
+              third parties or affiliates.
+            </span>
+
             </label>
 
             <div className="btnRow">
@@ -752,9 +764,17 @@ await supabase.auth.resetPasswordForEmail(email, { redirectTo });
                 }}
                 style={{ marginTop: 4 }}
               />
-              <span className="muted" style={{ fontSize: 13 }}>
-                Optional: I agree to receive SMS messages (account + promos). Message &amp; data rates may apply.
-              </span>
+              <span className="muted" style={{ fontSize: 13, lineHeight: 1.35 }}>
+              Optional: I agree to receive SMS messages from Tate’s Supermarket (promotional and informational).
+              Message frequency may vary. Message &amp; data rates may apply. Reply <b>STOP</b> to opt out at any time.
+              Reply <b>HELP</b> for assistance or visit{" "}
+              <a href="https://www.tatessupermarket.com" target="_blank" rel="noreferrer">
+                https://www.tatessupermarket.com
+              </a>
+              . See <Link href="/privacy">Privacy Policy</Link> for privacy policy and SMS terms. SMS consent is not shared with
+              third parties or affiliates.
+            </span>
+
             </label>
 
             <div className="btnRow">
