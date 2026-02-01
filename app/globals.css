@@ -6,12 +6,14 @@
   --blue: #2563eb;
   --blue2:#1d4ed8;
   --border:#e5e7eb;
+
+  /* page side padding (keep this matching your page padding: 18px) */
+  --pagePad: 18px;
 }
 
 *{ box-sizing:border-box; }
 a{ color:inherit; text-decoration:none; }
 
-/* ✅ Let the document scroll normally */
 html, body{
   height: auto;
   min-height: 100%;
@@ -20,7 +22,6 @@ html, body{
   -webkit-overflow-scrolling: touch;
 }
 
-/* ✅ Normal font back */
 body{
   margin:0;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
@@ -28,12 +29,9 @@ body{
               radial-gradient(1200px 600px at 80% 0%, rgba(37,99,235,.10), transparent 55%),
               var(--bg);
   color:var(--text);
-
-  /* ✅ vertical scroll everywhere */
-  touch-action: pan-y;
 }
 
-/* ✅ Images should NOT steal touch/scroll */
+/* prevent iOS “grab” on images without killing clicks everywhere */
 img{
   -webkit-user-drag: none;
   user-select: none;
@@ -52,7 +50,7 @@ img{
   background: var(--card);
   border:1px solid var(--border);
   border-radius:18px;
-  box-shadow: none; /* ✅ no shadow */
+  box-shadow: none;
 }
 
 .btn{
@@ -101,22 +99,33 @@ img{
 }
 
 /* =========================================================
-   ✅ CAROUSEL (Horizontal rows)
-   KEY FIX: allow BOTH pan-x + pan-y on the row
-   so vertical scroll always wins if the gesture is vertical.
+   ✅ HORIZONTAL CAROUSEL ROWS
    ========================================================= */
+
+/* This wrapper is what makes cards “go off screen” past side borders */
+.swipeBleed{
+  /* pull the row out of the page side padding */
+  margin-left: calc(var(--pagePad) * -1);
+  margin-right: calc(var(--pagePad) * -1);
+
+  /* keep content aligned with page padding */
+  padding-left: var(--pagePad);
+  padding-right: var(--pagePad);
+}
+
+/* The row itself scrolls sideways */
 .swipeRow, .hscroll{
   display: flex;
   gap: 12px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 2px 2px 12px;
+  padding: 2px 0 12px;
   -webkit-overflow-scrolling: touch;
 
   scroll-snap-type: none;
   scroll-behavior: smooth;
 
-  /* ✅ THIS is the fix (do NOT set pan-x only) */
+  /* KEY: allow browser to choose vertical vs horizontal */
   touch-action: pan-x pan-y;
 
   scrollbar-width: none;
@@ -124,31 +133,24 @@ img{
 .swipeRow::-webkit-scrollbar,
 .hscroll::-webkit-scrollbar{ display:none; }
 
-/* end cap makes it easy to scroll fully */
 .swipeEndCap{ width: 10px; flex: 0 0 auto; }
 
 /* =========================================================
-   ✅ DEAL CARDS — uniform size everywhere
+   ✅ DEAL CARDS (uniform size, images fit)
    ========================================================= */
+
 .dealCard,
 .dealCardCompact{
   flex: 0 0 auto;
-
-  /* ✅ force all rows to same size (fixes Top Deals being huge) */
-  width: 320px;
-
+  width: 320px;               /* uniform size for all rows */
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #ffffff;
   overflow: hidden;
   display: grid;
   box-shadow: none;
-
-  /* ✅ allow vertical scroll even when touching card */
-  touch-action: pan-y;
 }
 
-/* ✅ same width on small screens */
 @media (max-width: 420px){
   .dealCard,
   .dealCardCompact{
@@ -156,7 +158,6 @@ img{
   }
 }
 
-/* ✅ IMAGE MUST have a real height + object-fit */
 .dealImg,
 .dealImgCompact{
   height: 180px;
@@ -164,28 +165,12 @@ img{
   object-fit: cover;
   display: block;
   background: #e5e7eb;
-}
 
-/* ✅ Make images bleed past the side padding ("off the screen" look)
-   NOTE: your page uses 18px padding, so we bleed by 18px each side.
-*/
-.dealImg,
-.dealImgCompact{
-  width: calc(100% + 36px);
-  margin-left: -18px;
-  margin-right: -18px;
-  border-radius: 0;
-}
-
-/* ✅ images do not block scrolling */
-.dealImg,
-.dealImgCompact{
+  /* image shouldn’t “grab” scroll on iOS */
   pointer-events: none;
 }
 
-/* text */
 .dealBody{ padding: 14px; display: grid; gap: 7px; }
-
 .dealName{
   font-weight: 950;
   font-size: 18px;
@@ -206,7 +191,51 @@ img{
 }
 
 /* =========================================================
-   Kiosk styles (unchanged)
+   ✅ Logo + Tabs (TopNav)
+   ========================================================= */
+
+.topNavWrap { margin-bottom: 14px; }
+
+.logoBar{
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 6px;
+}
+
+.logoBox{
+  width: 100%;
+  max-width: 980px;
+  margin: 0 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(29,78,216,0.12);
+  background: #ffffff;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logoImg{
+  height: 48px;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.tabs{
+  display: flex;
+  justify-content: center;
+  gap: 44px;
+  font-weight: 950;
+  margin: 10px 0 0;
+}
+
+.tab{ text-decoration: none; color: #94a3b8; padding-bottom: 6px; }
+.tabActive{ color: #1d4ed8; border-bottom: 3px solid #1d4ed8; }
+
+/* =========================================================
+   Kiosk styles (leave as-is)
    ========================================================= */
 .kioskRoot { height: 100vh; width: 100vw; overflow: hidden; background: #f3f7ff; }
 .kioskWrap { height: 100%; width: 100%; display: flex; flex-direction: column; padding: 14px; box-sizing: border-box; }
@@ -237,90 +266,3 @@ img{
 }
 .kioskBtn.primary { background: #1d4ed8; color: #fff; }
 .kioskBtn.danger { background: #fee2e2; color: #991b1b; }
-
-/* =========================================================
-   ✅ iOS FIX: Vertical scroll must work even when finger is on a card
-   We make the *cards* ignore touch so the browser scrolls the page.
-   The swipeRow still scrolls sideways.
-   ========================================================= */
-
-/* Let browser decide vertical vs horizontal */
-.swipeRow,
-.hscroll {
-  touch-action: auto !important;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* The KEY: cards should NOT capture touch events */
-.dealCard,
-.dealCardCompact,
-.dealBody {
-  pointer-events: none !important;
-}
-
-/* Images also should not capture touches */
-.dealImg,
-.dealImgCompact {
-  pointer-events: none !important;
-  -webkit-user-drag: none;
-  user-select: none;
-}
-
-.logoImg {
-  height: 48px;        /* ✅ controls size */
-  max-width: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-/* ✅ Bleed images past the side padding ("off screen" look) */
-.dealImg,
-.dealImgCompact {
-  width: calc(100% + 36px) !important; /* assumes 18px page padding */
-  margin-left: -18px !important;
-  margin-right: -18px !important;
-  border-radius: 0 !important;
-  object-fit: cover !important;
-  display: block !important;
-}
-
-/* ===== Shared TopNav (Logo + Tabs) ===== */
-.topNavWrap { margin-bottom: 14px; }
-
-.logoBar {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  padding: 10px 0 6px;
-}
-
-.logoBox {
-  width: 100%;
-  max-width: 980px;
-  margin: 0 12px;
-  border-radius: 18px;
-  border: 1px solid rgba(29,78,216,0.12);
-  background: #ffffff;
-  padding: 8px 12px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.logoImg {
-  height: 48px;
-  max-width: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.tabs {
-  display: flex;
-  justify-content: center;
-  gap: 44px;
-  font-weight: 950;
-  margin: 10px 0 0;
-}
-
-.tab { text-decoration: none; color: #94a3b8; padding-bottom: 6px; }
-.tabActive { color: #1d4ed8; border-bottom: 3px solid #1d4ed8; }

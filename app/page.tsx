@@ -68,28 +68,38 @@ function SwipeRow({
         </div>
       </div>
 
-      <div ref={rowRef} className="swipeRow" aria-label={title}>
-        {deals.map((d) => (
-          <div key={d.id} className={"dealCard " + (compact ? "dealCardCompact" : "")}>
-            {d.image_url ? (
-              <img
-                className={"dealImg " + (compact ? "dealImgCompact" : "")}
-                src={d.image_url}
-                alt={String(d.name ?? "Deal")}
-                draggable={false}
-              />
-            ) : (
-              <div className={"dealImg " + (compact ? "dealImgCompact" : "")} />
-            )}
+      <div className="swipeBleed">
+        <div ref={rowRef} className="swipeRow" aria-label={title}>
+          {deals.map((d) => (
+            <div
+              key={d.id}
+              className={"dealCard " + (compact ? "dealCardCompact" : "")}
+            >
+              {d.image_url ? (
+                <img
+                  className={"dealImg " + (compact ? "dealImgCompact" : "")}
+                  src={d.image_url}
+                  alt={String(d.name ?? "Deal")}
+                  draggable={false}
+                />
+              ) : (
+                <div className={"dealImg " + (compact ? "dealImgCompact" : "")} />
+              )}
 
-            <div className="dealBody">
-              <div className="dealName">{d.name ?? "Deal"}</div>
-              {d.description ? <div className="dealDesc">{d.description}</div> : null}
-              {d.price != null ? <div className="dealPrice">{money(d.price)}</div> : null}
+              <div className="dealBody">
+                <div className="dealName">{d.name ?? "Deal"}</div>
+                {d.description ? (
+                  <div className="dealDesc">{d.description}</div>
+                ) : null}
+                {d.price != null ? (
+                  <div className="dealPrice">{money(d.price)}</div>
+                ) : null}
+              </div>
             </div>
-          </div>
-        ))}
-        <div className="swipeEndCap" />
+          ))}
+
+          <div className="swipeEndCap" />
+        </div>
       </div>
     </div>
   );
