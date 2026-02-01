@@ -621,8 +621,7 @@ export default function CashierPage() {
         .keyDone { background: #1d4ed8; color: #fff; border-color: #1d4ed8; grid-column: 1 / -1; }
       `}</style>
 
-      {/* EVERYTHING BELOW IS YOUR EXISTING UI, UNCHANGED */}
-      <div className="topBar">
+       <div className="topBar">
         <div className="brand">
           <span className="dot" />
           Cashier
@@ -646,21 +645,106 @@ export default function CashierPage() {
       <div className="main">
         {/* MEMBER TAB */}
         <div className={"pane " + (tab === 0 ? "paneActive" : "")}>
-          {/* ... your member tab content ... */}
+          <div className="title">Scan Member</div>
+          <div className="muted" style={{ marginTop: 6 }}>
+            Tap amount to enter with keypad. Swipe left for Sale Items.
+          </div>
+
+          <div className="grid2">
+            <div>
+              <div className="label">Receipt Amount</div>
+              <div className="amountBox" onClick={() => setPadOpen(true)}>
+                <div>
+                  <div style={{ lineHeight: 1.1 }}>{amountRaw ? amountRaw : "Tap to enter"}</div>
+                  <div className="amountHint">Type cents: 1298 = $12.98</div>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 950, color: "#1d4ed8" }}>
+                  {formatMoneyFromRaw(amountRaw)}
+                </div>
+              </div>
+              <div className="moneyPreview">{formatMoneyFromRaw(amountRaw)}</div>
+            </div>
+
+            <div>
+              <div className="label">Member ID</div>
+              <div className="bigInput" style={{ display: "flex", alignItems: "center" }}>
+                {memberId ? memberId : "Scan member QR"}
+              </div>
+            </div>
+          </div>
+
+          <div className="bigBtnRow">
+            {!scanning ? (
+              <button className="bigBtn bigBtnPrimary" onClick={startScanner}>
+                Scan Member QR
+              </button>
+            ) : (
+              <button className="bigBtn" onClick={stopScanner}>
+                Stop Camera
+              </button>
+            )}
+            <button className="bigBtn bigBtnPrimary" onClick={recordPurchase}>
+              Save Purchase
+            </button>
+          </div>
+
+          <div className="statusBox">{scanStatus || status || "Ready."}</div>
         </div>
 
         {/* SALE TAB */}
         <div className={"pane " + (tab === 1 ? "paneActive" : "")}>
-          {/* ... your sale tab content ... */}
+          <div className="title">Sale Items (Scan from Screen)</div>
+          <div className="muted" style={{ marginTop: 6 }}>
+            Updates automatically. Swipe right to go back.
+          </div>
+
+          {saleLoading ? (
+            <div className="statusBox" style={{ marginTop: 14 }}>
+              Loading sale items…
+            </div>
+          ) : saleStatus ? (
+            <div className="statusBox" style={{ marginTop: 14 }}>
+              {saleStatus}
+            </div>
+          ) : sale.length === 0 ? (
+            <div className="statusBox" style={{ marginTop: 14 }}>
+              No active sale items.
+            </div>
+          ) : (
+            <div className="saleGrid">
+              {sale.slice(0, 8).map((it) => (
+                <div key={it.id} className="saleCard">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                    <div className="saleName">{it.name}</div>
+                    <div className="salePrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
+                  </div>
+                  <BarcodeCanvas upc={it.upc} />
+                  <div className="saleUpc">UPC: {digitsOnly(it.upc)}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* overlays ... unchanged */}
       {/* CAMERA OVERLAY */}
       {scanning && (
         <div className="overlay" onClick={stopScanner}>
           <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
-            {/* ... */}
+            <div className="title" style={{ fontSize: 18 }}>
+              Scan QR
+            </div>
+            <div className="muted" style={{ marginTop: 6 }}>
+              Center the member QR in the box.
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <div id={"qr-reader"} style={{ width: "100%" }} />
+            </div>
+            <div className="bigBtnRow" style={{ marginTop: 12 }}>
+              <button className="bigBtn" onClick={stopScanner}>
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -669,7 +753,36 @@ export default function CashierPage() {
       {padOpen && (
         <div className="overlay" onClick={() => setPadOpen(false)}>
           <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
-            {/* ... */}
+            <div className="title" style={{ fontSize: 18 }}>
+              Enter Amount
+            </div>
+            <div className="muted" style={{ marginTop: 6 }}>
+              Type cents: 1298 = $12.98
+            </div>
+
+            <div className="moneyPreview" style={{ textAlign: "center", marginTop: 12 }}>
+              {formatMoneyFromRaw(amountRaw)}
+            </div>
+
+            <div className="keypad">
+              {"123456789".split("").map((d) => (
+                <button key={d} className="key" onClick={() => keyPress(d)}>
+                  {d}
+                </button>
+              ))}
+              <button className="key keyAlt" onClick={() => keyPress("clear")}>
+                Clear
+              </button>
+              <button className="key" onClick={() => keyPress("0")}>
+                0
+              </button>
+              <button className="key keyAlt" onClick={() => keyPress("back")}>
+                ⌫
+              </button>
+              <button className="key keyDone" onClick={() => keyPress("done")}>
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -678,13 +791,29 @@ export default function CashierPage() {
       {redeemOpen && redeemUpc && (
         <div className="overlay" onClick={() => setRedeemOpen(false)}>
           <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
-            {/* ... */}
+            <div className="title">Redeem Coupon</div>
+            <div className="muted" style={{ marginTop: 6 }}>
+              {redeemMsg}
+            </div>
+
+            <div style={{ marginTop: 14 }}>
+              <BarcodeCanvas upc={redeemUpc} />
+              <div className="muted" style={{ marginTop: 8, fontWeight: 900 }}>
+                Scan this on the POS: ${(redeemCents / 100).toFixed(2)} OFF
+              </div>
+            </div>
+
+            <div className="bigBtnRow" style={{ marginTop: 14 }}>
+              <button className="bigBtn bigBtnPrimary" onClick={() => setRedeemOpen(false)}>
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
   </div>
-);
+  );
 }
 
 
