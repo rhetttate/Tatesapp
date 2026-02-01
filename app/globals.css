@@ -246,32 +246,124 @@ img{
 /* ================================
    Kiosk (leave as-is)
    ================================ */
-.kioskRoot { height: 100vh; width: 100vw; overflow: hidden; background: #f3f7ff; }
-.kioskWrap { height: 100%; width: 100%; display: flex; flex-direction: column; padding: 14px; box-sizing: border-box; }
-.kioskTopbar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; padding: 12px 14px; border-radius: 18px;
-  background: #ffffff; border: 1px solid rgba(29,78,216,0.14);
+/* ================================
+   ✅ Kiosk (Cashier UI)
+   Always fits on screen.
+   Only the panel scrolls.
+   ================================ */
+
+/* Fullscreen shell */
+.kioskRoot{
+  height: 100svh;          /* modern mobile/tablet */
+  height: 100vh;           /* fallback */
+  width: 100vw;
+  overflow: hidden;
+  background: #f3f7ff;
+}
+
+/* Column layout */
+.kioskWrap{
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+/* Fixed header */
+.kioskTopbar{
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid rgba(29,78,216,0.14);
   box-shadow: 0 8px 24px rgba(10,42,122,0.06);
 }
-.kioskBrand { font-weight: 950; color: #0a2a7a; font-size: 18px; display: flex; gap: 10px; align-items: center; }
-.dot { width: 10px; height: 10px; border-radius: 999px; background: #1d4ed8; display: inline-block; }
-.pill { padding: 7px 10px; border-radius: 999px; background: rgba(29,78,216,0.10); color: #1d4ed8; font-weight: 950; font-size: 12px; }
 
-.kioskPanel {
-  flex: 1; margin-top: 12px;
-  background: #fff; border: 1px solid rgba(29,78,216,0.14);
-  border-radius: 22px; box-shadow: 0 8px 24px rgba(10,42,122,0.06);
-  padding: 14px; overflow: hidden;
-  display: flex; flex-direction: column;
+/* Brand (left) */
+.kioskBrand{
+  font-weight: 950;
+  color: #0a2a7a;
+  font-size: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
 }
-.kioskTitle { font-size: 20px; font-weight: 950; color: #0a2a7a; }
-.kioskMuted { color: rgba(10,42,122,0.65); font-weight: 850; margin-top: 4px; }
+.kioskLogo{
+  height: 34px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+.dot{
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #1d4ed8;
+  display: inline-block;
+}
+.pill{
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(29,78,216,0.10);
+  color: #1d4ed8;
+  font-weight: 950;
+  font-size: 12px;
+  white-space: nowrap;
+}
 
-.kioskBtn {
-  padding: 14px 16px; border-radius: 16px; border: 0;
-  font-weight: 950; cursor: pointer;
-  background: #e8efff; color: #1d4ed8;
+/* Actions (right) */
+.kioskActions{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex: 0 0 auto;
 }
-.kioskBtn.primary { background: #1d4ed8; color: #fff; }
-.kioskBtn.danger { background: #fee2e2; color: #991b1b; }
+
+/* Scrollable panel */
+.kioskPanel{
+  flex: 1 1 auto;
+  min-height: 0;           /* ✅ critical inside flex */
+  background: #fff;
+  border: 1px solid rgba(29,78,216,0.14);
+  border-radius: 22px;
+  box-shadow: 0 8px 24px rgba(10,42,122,0.06);
+  padding: 14px;
+  overflow: auto;          /* ✅ only this scrolls */
+}
+
+/* Basic kiosk text */
+.kioskTitle{ font-size: 20px; font-weight: 950; color: #0a2a7a; }
+.kioskMuted{ color: rgba(10,42,122,0.65); font-weight: 850; margin-top: 4px; }
+
+/* Kiosk buttons */
+.kioskBtn{
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 0;
+  font-weight: 950;
+  cursor: pointer;
+  background: #e8efff;
+  color: #1d4ed8;
+}
+.kioskBtn.primary{ background: #1d4ed8; color: #fff; }
+.kioskBtn.danger{ background: #fee2e2; color: #991b1b; }
+
+/* Inside-panel helpers */
+.kioskHr{ height: 1px; background: rgba(29,78,216,0.12); margin: 14px 0; }
+
+.kioskGrid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+@media (max-width: 760px){
+  .kioskGrid{ grid-template-columns: 1fr; }
+}
