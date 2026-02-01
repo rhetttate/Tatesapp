@@ -7,7 +7,7 @@
   --blue2:#1d4ed8;
   --border:#e5e7eb;
 
-  /* page side padding (keep this matching your page padding: 18px) */
+  /* match your page padding */
   --pagePad: 18px;
 }
 
@@ -25,26 +25,125 @@ html, body{
 body{
   margin:0;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
-  background: radial-gradient(1200px 600px at 20% -10%, rgba(37,99,235,.18), transparent 60%),
-              radial-gradient(1200px 600px at 80% 0%, rgba(37,99,235,.10), transparent 55%),
-              var(--bg);
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(37,99,235,.18), transparent 60%),
+    radial-gradient(1200px 600px at 80% 0%, rgba(37,99,235,.10), transparent 55%),
+    var(--bg);
   color:var(--text);
 }
 
-/* prevent iOS “grab” on images without killing clicks everywhere */
+/* images shouldn't “grab” */
 img{
   -webkit-user-drag: none;
   user-select: none;
   -webkit-touch-callout: none;
 }
 
-/* common UI */
-.container{
-  width:100%;
-  max-width:1100px;
-  margin:0 auto;
-  padding:24px;
+/* ================================
+   Page layout helpers
+   ================================ */
+
+/* Use this on your Deals page wrapper if you want consistency */
+.pageInner{
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 14px var(--pagePad) 26px;
 }
+
+/* ================================
+   Horizontal swipe rows
+   ================================ */
+
+/* This is the magic: it breaks the swipe row OUT of side padding */
+.swipeBleed{
+  margin-left: calc(var(--pagePad) * -1);
+  margin-right: calc(var(--pagePad) * -1);
+  padding-left: var(--pagePad);
+  padding-right: var(--pagePad);
+  overflow: visible;
+}
+
+/* The row scrolls sideways */
+.swipeRow, .hscroll{
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0 12px;
+  -webkit-overflow-scrolling: touch;
+
+  /* do NOT block vertical scrolling */
+  touch-action: pan-x pan-y;
+
+  scrollbar-width: none;
+}
+.swipeRow::-webkit-scrollbar,
+.hscroll::-webkit-scrollbar{ display:none; }
+
+.swipeEndCap{ width: 10px; flex: 0 0 auto; }
+
+/* ================================
+   Deal cards
+   ================================ */
+
+.dealCard,
+.dealCardCompact{
+  flex: 0 0 auto;
+  width: 320px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+
+  /* keep the image clipped to the card */
+  overflow: hidden;
+
+  display: grid;
+  box-shadow: none;
+}
+
+/* mobile width */
+@media (max-width: 420px){
+  .dealCard,
+  .dealCardCompact{
+    width: 86vw;
+  }
+}
+
+/* image must fit */
+.dealImg,
+.dealImgCompact{
+  height: 180px;
+  width: 100%;
+  object-fit: cover;
+  display: block;
+  background: #e5e7eb;
+  pointer-events: none;
+}
+
+.dealBody{ padding: 14px; display: grid; gap: 7px; }
+
+.dealName{
+  font-weight: 950;
+  font-size: 18px;
+  color: #0a2a7a;
+  line-height: 1.12;
+}
+.dealDesc{
+  color: rgba(10,42,122,0.70);
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.22;
+}
+.dealPrice{
+  font-weight: 950;
+  font-size: 22px;
+  color: #1d4ed8;
+  margin-top: 2px;
+}
+
+/* ================================
+   Common UI
+   ================================ */
 
 .card{
   background: var(--card);
@@ -85,161 +184,9 @@ img{
 
 .muted{ color: var(--muted); font-weight: 800; }
 
-/* ===== Modal ===== */
-.modalOverlay{
-  position:fixed; inset:0;
-  background: rgba(15,23,42,.55);
-  display:flex; align-items:center; justify-content:center;
-  padding:16px;
-  z-index: 50;
-}
-.modal{
-  width:min(520px, 100%);
-  padding:16px;
-}
-
-/* =========================================================
-   ✅ HORIZONTAL CAROUSEL ROWS
-   ========================================================= */
-
-/* This wrapper is what makes cards “go off screen” past side borders */
-.swipeBleed{
-  /* pull the row out of the page side padding */
-  margin-left: calc(var(--pagePad) * -1);
-  margin-right: calc(var(--pagePad) * -1);
-
-  /* keep content aligned with page padding */
-  padding-left: var(--pagePad);
-  padding-right: var(--pagePad);
-}
-
-/* The row itself scrolls sideways */
-.swipeRow, .hscroll{
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 2px 0 12px;
-  -webkit-overflow-scrolling: touch;
-
-  scroll-snap-type: none;
-  scroll-behavior: smooth;
-
-  /* KEY: allow browser to choose vertical vs horizontal */
-  touch-action: pan-x pan-y;
-
-  scrollbar-width: none;
-}
-.swipeRow::-webkit-scrollbar,
-.hscroll::-webkit-scrollbar{ display:none; }
-
-.swipeEndCap{ width: 10px; flex: 0 0 auto; }
-
-/* ===== Page frame that creates the “side borders” BEHIND content ===== */
-.pageFrame{
-  position: relative;
-  min-height: 100vh;
-  background: #f3f7ff;
-  padding: var(--pagePad);
-}
-
-/* These create the left/right “border gutters” behind everything */
-.pageFrame::before,
-.pageFrame::after{
-  content: "";
-  position: fixed;              /* stays on screen while you scroll */
-  top: 0;
-  bottom: 0;
-  width: var(--pagePad);        /* matches side padding */
-  background: #f3f7ff;          /* same as page bg */
-  border-left: 1px solid rgba(29,78,216,0.12);
-  z-index: 0;                   /* behind content */
-  pointer-events: none;
-}
-.pageFrame::before{
-  left: 0;
-}
-.pageFrame::after{
-  right: 0;
-}
-
-/* Your actual content sits ABOVE the frame */
-.pageFrameInner{
-  position: relative;
-  z-index: 2;
-}
-
-/* ===== Swipe bleed must be ABOVE everything and not clipped ===== */
-.swipeBleed{
-  position: relative;
-  z-index: 3;
-  overflow: visible;
-
-  /* pull out of the inner padding so cards can go “past the borders” */
-  margin-left: calc(var(--pagePad) * -1);
-  margin-right: calc(var(--pagePad) * -1);
-  padding-left: var(--pagePad);
-  padding-right: var(--pagePad);
-}
-
-/* =========================================================
-   ✅ DEAL CARDS (uniform size, images fit)
-   ========================================================= */
-
-.dealCard,
-.dealCardCompact{
-  flex: 0 0 auto;
-  width: 320px;               /* uniform size for all rows */
-  border-radius: 18px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff;
-  overflow: hidden;
-  display: grid;
-  box-shadow: none;
-}
-
-@media (max-width: 420px){
-  .dealCard,
-  .dealCardCompact{
-    width: 86vw;
-  }
-}
-
-.dealImg,
-.dealImgCompact{
-  height: 180px;
-  width: 100%;
-  object-fit: cover;
-  display: block;
-  background: #e5e7eb;
-
-  /* image shouldn’t “grab” scroll on iOS */
-  pointer-events: none;
-}
-
-.dealBody{ padding: 14px; display: grid; gap: 7px; }
-.dealName{
-  font-weight: 950;
-  font-size: 18px;
-  color: #0a2a7a;
-  line-height: 1.12;
-}
-.dealDesc{
-  color: rgba(10,42,122,0.70);
-  font-weight: 800;
-  font-size: 14px;
-  line-height: 1.22;
-}
-.dealPrice{
-  font-weight: 950;
-  font-size: 22px;
-  color: #1d4ed8;
-  margin-top: 2px;
-}
-
-/* =========================================================
-   ✅ Logo + Tabs (TopNav)
-   ========================================================= */
+/* ================================
+   TopNav (logo + tabs)
+   ================================ */
 
 .topNavWrap { margin-bottom: 14px; }
 
@@ -281,9 +228,9 @@ img{
 .tab{ text-decoration: none; color: #94a3b8; padding-bottom: 6px; }
 .tabActive{ color: #1d4ed8; border-bottom: 3px solid #1d4ed8; }
 
-/* =========================================================
-   Kiosk styles (leave as-is)
-   ========================================================= */
+/* ================================
+   Kiosk (leave as-is)
+   ================================ */
 .kioskRoot { height: 100vh; width: 100vw; overflow: hidden; background: #f3f7ff; }
 .kioskWrap { height: 100%; width: 100%; display: flex; flex-direction: column; padding: 14px; box-sizing: border-box; }
 .kioskTopbar {
