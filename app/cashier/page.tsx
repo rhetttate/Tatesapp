@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
-// ---------- helpers ----------
+/* ---------- helpers ---------- */
 function digitsOnly(s: string) {
   return (s || "").replace(/\D/g, "");
 }
@@ -39,6 +39,7 @@ function beep(freq = 880, ms = 120) {
     }, ms + 120);
   } catch {}
 }
+
 function vibrate(ms = 40) {
   try {
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -48,7 +49,7 @@ function vibrate(ms = 40) {
   } catch {}
 }
 
-// ---------- types ----------
+/* ---------- types ---------- */
 type SaleItem = {
   id: string;
   name: string;
@@ -66,7 +67,8 @@ function getRegFromQuery(): string | null {
   return null;
 }
 
-function BarcodeCanvas({ upc }: { upc: string }) {
+/* ---------- barcode ---------- */
+function BarcodeCanvas({ upc, tall }: { upc: string; tall?: boolean }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -76,37 +78,47 @@ function BarcodeCanvas({ upc }: { upc: string }) {
         const mod: any = await import("bwip-js");
         const bwipjs = mod?.default ?? mod;
         if (cancelled) return;
+
         const canvas = ref.current;
         if (!canvas) return;
 
         bwipjs.toCanvas(canvas, {
           bcid: "upca",
           text: digitsOnly(upc).slice(0, 12),
-          scale: 3,
-          height: 10,
+          scale: tall ? 4 : 3,
+          height: tall ? 16 : 10,
           includetext: false,
         });
       } catch {}
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [upc]);
+  }, [upc, tall]);
 
   return (
-    <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-      <div style={{ width: "100%", maxWidth: 320 }}>
-        <canvas
-          ref={ref}
-          style={{ width: "100%", height: 90, borderRadius: 14, background: "#fff" }}
-        />
-      </div>
+    <div style={{ width: "100%" }}>
+      <canvas
+        ref={ref}
+        style={{
+          width: "100%",
+          height: tall ? 120 : 90,
+          borderRadius: 14,
+          background: "#fff",
+        }}
+      />
     </div>
   );
 }
 
 export default function CashierPage() {
-  const [tab, setTab] = useState<0 | 1>(0);
+  /* ✅ tab typing that NEVER breaks */
+  const TAB_MEMBER = 0 as const;
+  const TAB_SALE = 1 as const;
+  type Tab = typeof TAB_MEMBER | typeof TAB_SALE;
+
+  const [tab, setTab] = useState<Tab>(TAB_MEMBER);
 
   const [tabletId, setTabletId] = useState("REG1");
   useEffect(() => {
@@ -118,7 +130,6 @@ export default function CashierPage() {
       localStorage.setItem("sunstop_tablet_id", fromQuery);
       return;
     }
-
     if (saved) setTabletId(saved);
   }, []);
 
@@ -144,13 +155,15 @@ export default function CashierPage() {
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
-  // ✅ redeem popup
+  // redeem popup
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemUpc, setRedeemUpc] = useState<string | null>(null);
   const [redeemCents, setRedeemCents] = useState<number>(0);
   const [redeemMsg, setRedeemMsg] = useState<string>("");
 
-  // ---------- LOCKED SCREEN ----------
+  const saleMode = tab === TAB_SALE;
+
+  /* ---------- LOCKED SCREEN ---------- */
   useEffect(() => {
     const prevOverflow = document.documentElement.style.overflow;
     const prevBodyOverflow = document.body.style.overflow;
@@ -186,7 +199,7 @@ export default function CashierPage() {
     };
   }, []);
 
-  // ---------- swipe ----------
+  /* ---------- swipe ---------- */
   function onTouchStart(e: React.TouchEvent) {
     if (scanning || padOpen || redeemOpen) return;
     touchStartX.current = e.touches[0]?.clientX ?? null;
@@ -208,12 +221,12 @@ export default function CashierPage() {
     const dy = ey - sy;
 
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-      if (dx < 0) setTab(1);
-      if (dx > 0) setTab(0);
+      if (dx < 0) setTab(TAB_SALE);
+      if (dx > 0) setTab(TAB_MEMBER);
     }
   }
 
-  // ---------- scanner ----------
+  /* ---------- scanner ---------- */
   async function stopScanner() {
     try {
       const qr = qrRef.current;
@@ -274,7 +287,7 @@ export default function CashierPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---------- heartbeat ----------
+  /* ---------- heartbeat ---------- */
   useEffect(() => {
     if (!memberId.trim()) return;
     const t = setInterval(async () => {
@@ -285,7 +298,7 @@ export default function CashierPage() {
     return () => clearInterval(t);
   }, [tabletId, memberId]);
 
-  // ---------- auto disconnect after 60 seconds ----------
+  /* ---------- auto disconnect ---------- */
   useEffect(() => {
     if (!memberId.trim()) return;
 
@@ -314,14 +327,15 @@ export default function CashierPage() {
     } catch {}
   }
 
-  // ---------- purchases ----------
+  /* ---------- purchases ---------- */
   async function recordPurchase() {
     setStatus("");
     try {
       if (!memberId.trim()) throw new Error("Scan member QR first.");
       const amount = centsTextToNumber(amountRaw);
-      if (!Number.isFinite(amount) || amount <= 0)
+      if (!Number.isFinite(amount) || amount <= 0) {
         throw new Error("Enter amount (ex: 1298 for $12.98).");
+      }
 
       const { data, error } = await supabase.rpc("award_purchase", {
         p_member_token: memberId.trim(),
@@ -346,7 +360,7 @@ export default function CashierPage() {
     }
   }
 
-  // ---------- sale items ----------
+  /* ---------- sale items ---------- */
   async function loadSale() {
     setSaleLoading(true);
     setSaleStatus("");
@@ -356,7 +370,7 @@ export default function CashierPage() {
         .select("id,name,upc,price,active,sort_order")
         .eq("active", true)
         .order("sort_order", { ascending: true })
-        .limit(8);
+        .limit(8); // ✅ always 8 max
       if (error) throw error;
       setSale((data as any) || []);
     } catch (e: any) {
@@ -372,7 +386,7 @@ export default function CashierPage() {
     return () => clearInterval(t);
   }, []);
 
-  // ✅ REDEEM POLL
+  /* ---------- redeem poll ---------- */
   useEffect(() => {
     if (!tabletId) return;
 
@@ -411,7 +425,7 @@ export default function CashierPage() {
     return () => clearInterval(t);
   }, [tabletId]);
 
-  // ---------- keypad ----------
+  /* ---------- keypad ---------- */
   function keyPress(k: string) {
     if (k === "done") {
       setPadOpen(false);
@@ -431,18 +445,22 @@ export default function CashierPage() {
   }
 
   return (
-  <div className="kioskRoot" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-    <div className="kioskWrap">
+    <div className="kioskRoot" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <style jsx global>{`
         html, body { height: 100%; background: #f3f7ff; }
         body { margin: 0; }
         * { -webkit-tap-highlight-color: transparent; user-select: none; }
         input { user-select: text; }
 
-        /* IMPORTANT:
-          Do NOT redefine .kioskRoot here.
-          global.css already sets kioskRoot/kioskWrap/kioskPanel.
-        */
+        /* wrapper */
+        .kioskWrap {
+          height: 100%;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          padding: 14px;
+          box-sizing: border-box;
+        }
 
         .topBar {
           display: flex; align-items: center; justify-content: space-between;
@@ -459,6 +477,7 @@ export default function CashierPage() {
           font-weight: 950; color: #0a2a7a; font-size: 18px;
           min-width: 0;
         }
+        .dot { width: 10px; height: 10px; border-radius: 999px; background: #1d4ed8; }
 
         .pill {
           padding: 7px 10px; border-radius: 999px;
@@ -477,9 +496,11 @@ export default function CashierPage() {
         .tabBtnActive { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
         .tabBtnDanger { background: #fff; border-color: rgba(220,38,38,0.25); color: #b91c1c; }
 
+        /* main container that fills remaining height */
         .main {
           flex: 1;
           min-height: 0;
+          margin-top: 12px;
           border-radius: 22px;
           background: #fff;
           border: 1px solid rgba(10, 60, 160, 0.10);
@@ -493,7 +514,7 @@ export default function CashierPage() {
           min-height: 0;
           padding: 16px;
           display: none;
-          overflow: auto; /* ✅ pane scrolls if needed */
+          overflow: auto;
           box-sizing: border-box;
         }
         .paneActive { display: block; }
@@ -518,10 +539,13 @@ export default function CashierPage() {
           font-size: 18px; font-weight: 900;
           border-radius: 18px;
           border: 1px solid rgba(10,60,160,0.18);
-          outline: none; box-sizing: border-box;
+          outline: none;
           background: #fff;
           overflow: hidden;
           text-overflow: ellipsis;
+          white-space: nowrap;
+          display: flex;
+          align-items: center;
         }
 
         .amountBox {
@@ -574,27 +598,23 @@ export default function CashierPage() {
           box-shadow: 0 18px 50px rgba(10,42,122,0.18);
         }
 
+        /* Sale grid default */
         .saleGrid {
-          margin-top: 14px;
+          margin-top: 12px;
           display: grid;
           grid-template-columns: repeat(4, 1fr);
-          gap: 14px;
-        }
-        @media (max-width: 1100px){
-          .saleGrid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 760px){
-          .saleGrid { grid-template-columns: 1fr; }
+          gap: 12px;
         }
 
         .saleCard {
           border-radius: 22px;
           border: 1px solid rgba(10,60,160,0.14);
           background: #f8fbff;
-          padding: 14px;
+          padding: 12px;
           display: grid;
           gap: 10px;
           align-content: start;
+          min-height: 0;
         }
 
         .saleName { font-weight: 950; font-size: 18px; color: #0a2a7a; }
@@ -619,201 +639,232 @@ export default function CashierPage() {
         }
         .keyAlt { background: rgba(29,78,216,0.08); }
         .keyDone { background: #1d4ed8; color: #fff; border-color: #1d4ed8; grid-column: 1 / -1; }
+
+        /* ============================
+           SALE FULLSCREEN MODE
+           - hide everything except sale grid
+           ============================ */
+        .saleMode .topBar { display: none !important; }
+        .saleMode .main { margin-top: 0 !important; }
+        .saleMode .pane {
+          padding: 10px !important;
+          overflow: hidden !important;
+        }
+
+        /* Fill the panel with 2x4 grid */
+        .saleMode .saleGrid{
+          margin-top: 10px !important;
+          height: calc(100% - 40px);
+          grid-template-columns: repeat(4, 1fr);
+          grid-template-rows: repeat(2, 1fr);
+          gap: 12px;
+        }
+
+        .saleMode .saleCard{
+          height: 100%;
+          min-height: 0 !important;
+          padding: 12px;
+          grid-template-rows: auto 1fr auto;
+        }
+
+        .saleMode .saleName{ font-size: 20px; }
+        .saleMode .salePrice{ font-size: 26px; }
+        .saleMode .saleUpc{ font-size: 13px; }
       `}</style>
 
-       <div className="topBar">
-        <div className="brand">
-          <span className="dot" />
-          Cashier
-          <span className="pill">{tabletId}</span>
-          <span className="pill">{memberId ? "CONNECTED" : "NOT CONNECTED"}</span>
-        </div>
-
-        <div className="tabs">
-          <button className={"tabBtn " + (tab === 0 ? "tabBtnActive" : "")} onClick={() => setTab(0)}>
-            Member
-          </button>
-          <button className={"tabBtn " + (tab === 1 ? "tabBtnActive" : "")} onClick={() => setTab(1)}>
-            Sale
-          </button>
-          <button className="tabBtn tabBtnDanger" onClick={disconnect}>
-            Disconnect
-          </button>
-        </div>
-      </div>
-
-      <div className="main">
-        {/* MEMBER TAB */}
-        <div className={"pane " + (tab === 0 ? "paneActive" : "")}>
-          <div className="title">Scan Member</div>
-          <div className="muted" style={{ marginTop: 6 }}>
-            Tap amount to enter with keypad. Swipe left for Sale Items.
+      <div className={"kioskWrap " + (saleMode ? "saleMode" : "")}>
+        {/* TOP BAR (hidden in saleMode by CSS; still rendered okay) */}
+        <div className="topBar">
+          <div className="brand">
+            <span className="dot" />
+            Cashier
+            <span className="pill">{tabletId}</span>
+            <span className="pill">{memberId ? "CONNECTED" : "NOT CONNECTED"}</span>
           </div>
 
-          <div className="grid2">
-            <div>
-              <div className="label">Receipt Amount</div>
-              <div className="amountBox" onClick={() => setPadOpen(true)}>
-                <div>
-                  <div style={{ lineHeight: 1.1 }}>{amountRaw ? amountRaw : "Tap to enter"}</div>
-                  <div className="amountHint">Type cents: 1298 = $12.98</div>
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 950, color: "#1d4ed8" }}>
-                  {formatMoneyFromRaw(amountRaw)}
-                </div>
-              </div>
-              <div className="moneyPreview">{formatMoneyFromRaw(amountRaw)}</div>
-            </div>
-
-            <div>
-              <div className="label">Member ID</div>
-              <div className="bigInput" style={{ display: "flex", alignItems: "center" }}>
-                {memberId ? memberId : "Scan member QR"}
-              </div>
-            </div>
-          </div>
-
-          <div className="bigBtnRow">
-            {!scanning ? (
-              <button className="bigBtn bigBtnPrimary" onClick={startScanner}>
-                Scan Member QR
-              </button>
-            ) : (
-              <button className="bigBtn" onClick={stopScanner}>
-                Stop Camera
-              </button>
-            )}
-            <button className="bigBtn bigBtnPrimary" onClick={recordPurchase}>
-              Save Purchase
+          <div className="tabs">
+            <button
+              className={"tabBtn " + (tab === TAB_MEMBER ? "tabBtnActive" : "")}
+              onClick={() => setTab(TAB_MEMBER)}
+            >
+              Member
+            </button>
+            <button
+              className={"tabBtn " + (tab === TAB_SALE ? "tabBtnActive" : "")}
+              onClick={() => setTab(TAB_SALE)}
+            >
+              Sale
+            </button>
+            <button className="tabBtn tabBtnDanger" onClick={disconnect}>
+              Disconnect
             </button>
           </div>
-
-          <div className="statusBox">{scanStatus || status || "Ready."}</div>
         </div>
 
-        {/* SALE TAB */}
-        <div className={"pane " + (tab === 1 ? "paneActive" : "")}>
-          <div className="title">Sale Items (Scan from Screen)</div>
-          <div className="muted" style={{ marginTop: 6 }}>
-            Updates automatically. Swipe right to go back.
-          </div>
+        <div className="main">
+          {/* MEMBER TAB */}
+          <div className={"pane " + (tab === TAB_MEMBER ? "paneActive" : "")}>
+            <div className="title">Member</div>
 
-          {saleLoading ? (
-            <div className="statusBox" style={{ marginTop: 14 }}>
-              Loading sale items…
-            </div>
-          ) : saleStatus ? (
-            <div className="statusBox" style={{ marginTop: 14 }}>
-              {saleStatus}
-            </div>
-          ) : sale.length === 0 ? (
-            <div className="statusBox" style={{ marginTop: 14 }}>
-              No active sale items.
-            </div>
-          ) : (
-            <div className="saleGrid">
-              {sale.slice(0, 8).map((it) => (
-                <div key={it.id} className="saleCard">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                    <div className="saleName">{it.name}</div>
-                    <div className="salePrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
+            <div className="grid2">
+              <div>
+                <div className="label">Receipt Amount</div>
+                <div className="amountBox" onClick={() => setPadOpen(true)}>
+                  <div>
+                    <div style={{ lineHeight: 1.1 }}>{amountRaw ? amountRaw : "Tap to enter"}</div>
+                    <div className="amountHint">Type cents: 1298 = $12.98</div>
                   </div>
-                  <BarcodeCanvas upc={it.upc} />
-                  <div className="saleUpc">UPC: {digitsOnly(it.upc)}</div>
+                  <div style={{ fontSize: 20, fontWeight: 950, color: "#1d4ed8" }}>
+                    {formatMoneyFromRaw(amountRaw)}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+                <div className="moneyPreview">{formatMoneyFromRaw(amountRaw)}</div>
+              </div>
 
-      {/* CAMERA OVERLAY */}
-      {scanning && (
-        <div className="overlay" onClick={stopScanner}>
-          <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
-            <div className="title" style={{ fontSize: 18 }}>
-              Scan QR
-            </div>
-            <div className="muted" style={{ marginTop: 6 }}>
-              Center the member QR in the box.
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <div id={"qr-reader"} style={{ width: "100%" }} />
-            </div>
-            <div className="bigBtnRow" style={{ marginTop: 12 }}>
-              <button className="bigBtn" onClick={stopScanner}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* KEYPAD OVERLAY */}
-      {padOpen && (
-        <div className="overlay" onClick={() => setPadOpen(false)}>
-          <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
-            <div className="title" style={{ fontSize: 18 }}>
-              Enter Amount
-            </div>
-            <div className="muted" style={{ marginTop: 6 }}>
-              Type cents: 1298 = $12.98
-            </div>
-
-            <div className="moneyPreview" style={{ textAlign: "center", marginTop: 12 }}>
-              {formatMoneyFromRaw(amountRaw)}
-            </div>
-
-            <div className="keypad">
-              {"123456789".split("").map((d) => (
-                <button key={d} className="key" onClick={() => keyPress(d)}>
-                  {d}
-                </button>
-              ))}
-              <button className="key keyAlt" onClick={() => keyPress("clear")}>
-                Clear
-              </button>
-              <button className="key" onClick={() => keyPress("0")}>
-                0
-              </button>
-              <button className="key keyAlt" onClick={() => keyPress("back")}>
-                ⌫
-              </button>
-              <button className="key keyDone" onClick={() => keyPress("done")}>
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* REDEEM POPUP */}
-      {redeemOpen && redeemUpc && (
-        <div className="overlay" onClick={() => setRedeemOpen(false)}>
-          <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
-            <div className="title">Redeem Coupon</div>
-            <div className="muted" style={{ marginTop: 6 }}>
-              {redeemMsg}
-            </div>
-
-            <div style={{ marginTop: 14 }}>
-              <BarcodeCanvas upc={redeemUpc} />
-              <div className="muted" style={{ marginTop: 8, fontWeight: 900 }}>
-                Scan this on the POS: ${(redeemCents / 100).toFixed(2)} OFF
+              <div>
+                <div className="label">Member ID</div>
+                <div className="bigInput">{memberId ? memberId : "Scan member QR"}</div>
               </div>
             </div>
 
-            <div className="bigBtnRow" style={{ marginTop: 14 }}>
-              <button className="bigBtn bigBtnPrimary" onClick={() => setRedeemOpen(false)}>
-                Done
+            <div className="bigBtnRow">
+              {!scanning ? (
+                <button className="bigBtn bigBtnPrimary" onClick={startScanner}>
+                  Scan Member QR
+                </button>
+              ) : (
+                <button className="bigBtn" onClick={stopScanner}>
+                  Stop Camera
+                </button>
+              )}
+              <button className="bigBtn bigBtnPrimary" onClick={recordPurchase}>
+                Save Purchase
               </button>
             </div>
+
+            <div className="statusBox">{scanStatus || status || "Ready."}</div>
+          </div>
+
+          {/* SALE TAB (fullscreen mode auto via saleMode) */}
+          <div className={"pane " + (tab === TAB_SALE ? "paneActive" : "")}>
+            <div className="title">Sale Items</div>
+
+            {saleLoading ? (
+              <div className="statusBox" style={{ marginTop: 14 }}>
+                Loading sale items…
+              </div>
+            ) : saleStatus ? (
+              <div className="statusBox" style={{ marginTop: 14 }}>
+                {saleStatus}
+              </div>
+            ) : sale.length === 0 ? (
+              <div className="statusBox" style={{ marginTop: 14 }}>
+                No active sale items.
+              </div>
+            ) : (
+              <div className="saleGrid">
+                {sale.slice(0, 8).map((it) => (
+                  <div key={it.id} className="saleCard">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                      <div className="saleName">{it.name}</div>
+                      <div className="salePrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
+                    </div>
+
+                    <BarcodeCanvas upc={it.upc} tall />
+
+                    <div className="saleUpc">UPC: {digitsOnly(it.upc)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      )}
+
+        {/* CAMERA OVERLAY */}
+        {scanning && (
+          <div className="overlay" onClick={stopScanner}>
+            <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
+              <div className="title" style={{ fontSize: 18 }}>
+                Scan QR
+              </div>
+              <div className="muted" style={{ marginTop: 6 }}>
+                Center the member QR in the box.
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <div id={readerDivId} style={{ width: "100%" }} />
+              </div>
+              <div className="bigBtnRow" style={{ marginTop: 12 }}>
+                <button className="bigBtn" onClick={stopScanner}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* KEYPAD OVERLAY */}
+        {padOpen && (
+          <div className="overlay" onClick={() => setPadOpen(false)}>
+            <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
+              <div className="title" style={{ fontSize: 18 }}>
+                Enter Amount
+              </div>
+              <div className="muted" style={{ marginTop: 6 }}>
+                Type cents: 1298 = $12.98
+              </div>
+
+              <div className="moneyPreview" style={{ textAlign: "center", marginTop: 12 }}>
+                {formatMoneyFromRaw(amountRaw)}
+              </div>
+
+              <div className="keypad">
+                {"123456789".split("").map((d) => (
+                  <button key={d} className="key" onClick={() => keyPress(d)}>
+                    {d}
+                  </button>
+                ))}
+                <button className="key keyAlt" onClick={() => keyPress("clear")}>
+                  Clear
+                </button>
+                <button className="key" onClick={() => keyPress("0")}>
+                  0
+                </button>
+                <button className="key keyAlt" onClick={() => keyPress("back")}>
+                  ⌫
+                </button>
+                <button className="key keyDone" onClick={() => keyPress("done")}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* REDEEM POPUP */}
+        {redeemOpen && redeemUpc && (
+          <div className="overlay" onClick={() => setRedeemOpen(false)}>
+            <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
+              <div className="title">Redeem Coupon</div>
+              <div className="muted" style={{ marginTop: 6 }}>
+                {redeemMsg}
+              </div>
+
+              <div style={{ marginTop: 14 }}>
+                <BarcodeCanvas upc={redeemUpc} tall />
+                <div className="muted" style={{ marginTop: 8, fontWeight: 900 }}>
+                  Scan this on the POS: ${(redeemCents / 100).toFixed(2)} OFF
+                </div>
+              </div>
+
+              <div className="bigBtnRow" style={{ marginTop: 14 }}>
+                <button className="bigBtn bigBtnPrimary" onClick={() => setRedeemOpen(false)}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-  </div>
   );
 }
-
-
