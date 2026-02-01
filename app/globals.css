@@ -135,6 +135,53 @@ img{
 
 .swipeEndCap{ width: 10px; flex: 0 0 auto; }
 
+/* ===== Page frame that creates the “side borders” BEHIND content ===== */
+.pageFrame{
+  position: relative;
+  min-height: 100vh;
+  background: #f3f7ff;
+  padding: var(--pagePad);
+}
+
+/* These create the left/right “border gutters” behind everything */
+.pageFrame::before,
+.pageFrame::after{
+  content: "";
+  position: fixed;              /* stays on screen while you scroll */
+  top: 0;
+  bottom: 0;
+  width: var(--pagePad);        /* matches side padding */
+  background: #f3f7ff;          /* same as page bg */
+  border-left: 1px solid rgba(29,78,216,0.12);
+  z-index: 0;                   /* behind content */
+  pointer-events: none;
+}
+.pageFrame::before{
+  left: 0;
+}
+.pageFrame::after{
+  right: 0;
+}
+
+/* Your actual content sits ABOVE the frame */
+.pageFrameInner{
+  position: relative;
+  z-index: 2;
+}
+
+/* ===== Swipe bleed must be ABOVE everything and not clipped ===== */
+.swipeBleed{
+  position: relative;
+  z-index: 3;
+  overflow: visible;
+
+  /* pull out of the inner padding so cards can go “past the borders” */
+  margin-left: calc(var(--pagePad) * -1);
+  margin-right: calc(var(--pagePad) * -1);
+  padding-left: var(--pagePad);
+  padding-right: var(--pagePad);
+}
+
 /* =========================================================
    ✅ DEAL CARDS (uniform size, images fit)
    ========================================================= */

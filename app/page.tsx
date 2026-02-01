@@ -150,8 +150,8 @@ export default function DealsHomePage() {
   }, [deals]);
 
   return (
-    <div style={{ minHeight: "100vh", padding: 18 }}>
-      <div style={{ maxWidth: 980, margin: "0 auto", padding: "14px 18px 26px" }}>
+  <div className="pageFrame">
+    <div className="pageFrameInner" style={{ maxWidth: 980, margin: "0 auto", padding: "14px 0 26px" }}>
         <TopNav />
 
         {status ? (
