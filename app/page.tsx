@@ -70,6 +70,10 @@ function SwipeRow({
 
       <div className="swipeBleed">
         <div ref={rowRef} className="swipeRow" aria-label={title}>
+
+          {/* 👈 NEW: center spacer */}
+          <div className="swipeStartCap" />
+
           {deals.map((d) => (
             <div
               key={d.id}
@@ -88,12 +92,8 @@ function SwipeRow({
 
               <div className="dealBody">
                 <div className="dealName">{d.name ?? "Deal"}</div>
-                {d.description ? (
-                  <div className="dealDesc">{d.description}</div>
-                ) : null}
-                {d.price != null ? (
-                  <div className="dealPrice">{money(d.price)}</div>
-                ) : null}
+                {d.description && <div className="dealDesc">{d.description}</div>}
+                {d.price != null && <div className="dealPrice">{money(d.price)}</div>}
               </div>
             </div>
           ))}

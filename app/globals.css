@@ -80,6 +80,21 @@ img{
 .swipeRow::-webkit-scrollbar,
 .hscroll::-webkit-scrollbar{ display:none; }
 
+/* Centers the first card while still allowing bleed */
+.swipeStartCap,
+.swipeEndCap{
+  flex: 0 0 calc((100vw - min(1100px, 100vw)) / 2);
+  pointer-events: none;
+}
+
+/* Mobile tweak so it doesn’t over-center */
+@media (max-width: 420px){
+  .swipeStartCap,
+  .swipeEndCap{
+    flex: 0 0 12px;
+  }
+}
+
 .swipeEndCap{ width: 10px; flex: 0 0 auto; }
 
 /* ================================
