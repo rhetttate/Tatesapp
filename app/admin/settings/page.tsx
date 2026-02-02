@@ -16,6 +16,9 @@ export default function AdminSettingsPage() {
   const [pointsPerDollar, setPointsPerDollar] = useState<number>(4);
   const [pointValueCents, setPointValueCents] = useState<number>(1);
 
+  // ✅ new
+  const [doublePointsEnabled, setDoublePointsEnabled] = useState<boolean>(false);
+
   const adminPin = useMemo(() => process.env.NEXT_PUBLIC_ADMIN_PIN || "1234", []);
 
   useEffect(() => {
@@ -25,7 +28,7 @@ export default function AdminSettingsPage() {
       try {
         const { data, error } = await supabase
           .from("app_settings")
-          .select("points_per_dollar, point_value_cents")
+          .select("points_per_dollar, point_value_cents, double_points_enabled")
           .eq("id", 1)
           .maybeSingle();
 
@@ -33,6 +36,9 @@ export default function AdminSettingsPage() {
 
         if (data?.points_per_dollar != null) setPointsPerDollar(data.points_per_dollar);
         if (data?.point_value_cents != null) setPointValueCents(data.point_value_cents);
+
+        // ✅ new
+        setDoublePointsEnabled(!!data?.double_points_enabled);
       } catch (e: any) {
         setStatus("Error loading settings: " + (e?.message ?? String(e)));
       } finally {
@@ -60,27 +66,35 @@ export default function AdminSettingsPage() {
 
       if (!Number.isFinite(p) || p < 0 || p > 100) throw new Error("points_per_dollar must be 0-100.");
       if (!Number.isFinite(v) || v < 0 || v > 100) throw new Error("point_value_cents must be 0-100.");
-      const { data: sess } = await supabase.auth.getSession();
-      console.log("SESSION:", sess.session ? "authenticated" : "anon", sess.session?.user?.email);
 
       const { error } = await supabase
         .from("app_settings")
         .update({
           points_per_dollar: p,
           point_value_cents: v,
+          double_points_enabled: !!doublePointsEnabled, // ✅ new
           updated_at: new Date().toISOString(),
         })
         .eq("id", 1);
 
       if (error) throw error;
 
-      setStatus("Saved. Rate is now " + p + " pts per $1, and 1 pt = $" + (v / 100).toFixed(2));
+      setStatus(
+        `Saved ✅ Rate: ${p} pts/$1, 1 pt = $${(v / 100).toFixed(2)}. ` +
+          (doublePointsEnabled ? "DOUBLE POINTS is ON." : "Double points is OFF.")
+      );
     } catch (e: any) {
       setStatus("Save failed: " + (e?.message ?? String(e)));
     } finally {
       setSaving(false);
     }
   }
+
+  const previewSpend = 100;
+  const basePts = Math.floor(previewSpend * pointsPerDollar);
+  const multiplier = doublePointsEnabled ? 2 : 1;
+  const previewPts = basePts * multiplier;
+  const previewCash = (previewPts * pointValueCents) / 100;
 
   return (
     <div className="container">
@@ -131,7 +145,7 @@ export default function AdminSettingsPage() {
               ) : (
                 <div style={{ display: "grid", gap: 12 }}>
                   <label>
-                    Points per $1 (example: 4 for 4 percent back)
+                    Points per $1 (example: 3 means 3 points per dollar)
                     <input
                       className="input"
                       value={String(pointsPerDollar)}
@@ -150,20 +164,42 @@ export default function AdminSettingsPage() {
                     />
                   </label>
 
-                <div className="card" style={{ padding: 12, borderRadius: 14 }}>
-  <div style={{ fontWeight: 900 }}>Preview</div>
+                  {/* ✅ Double points toggle */}
+                  <label
+                    className="card"
+                    style={{
+                      padding: 12,
+                      borderRadius: 14,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 900 }}>Double Points Day</div>
+                      <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+                        When ON, cashier awards 2× points automatically.
+                      </div>
+                    </div>
 
-  <div className="muted" style={{ marginTop: 6 }}>
-    {"$100 spend → "} {Math.round(100 * pointsPerDollar)} points
-  </div>
+                    <input
+                      type="checkbox"
+                      checked={doublePointsEnabled}
+                      onChange={(e) => setDoublePointsEnabled(e.target.checked)}
+                      style={{ width: 22, height: 22 }}
+                    />
+                  </label>
 
-  <div className="muted" style={{ marginTop: 2 }}>
-    That equals $
-    {(Math.round(100 * pointsPerDollar) * pointValueCents / 100).toFixed(2)}
-    {" "}cashback value
-  </div>
-</div>
-
+                  <div className="card" style={{ padding: 12, borderRadius: 14 }}>
+                    <div style={{ fontWeight: 900 }}>Preview</div>
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      ${previewSpend} spend → {previewPts} points {doublePointsEnabled ? "(double points)" : ""}
+                    </div>
+                    <div className="muted" style={{ marginTop: 2 }}>
+                      That equals ${previewCash.toFixed(2)} cashback value
+                    </div>
+                  </div>
 
                   <button className="btn btnPrimary" onClick={save} disabled={saving} style={{ width: "100%" }}>
                     {saving ? "Saving..." : "Save Settings"}
