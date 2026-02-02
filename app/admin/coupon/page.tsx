@@ -17,6 +17,7 @@ type CouponRow = {
   starts_at: string | null;
   ends_at: string | null;
   created_at: string;
+  redeem_taps: number;
 };
 
 type RedemptionRow = {
@@ -145,19 +146,20 @@ export default function AdminCouponsPage() {
   async function load() {
     setStatus("");
     try {
-      const { data, error } = await supabase
-        .from("coupons")
-        .select("id,name,description,image_url,upc,redeem_type,active,sort_order,starts_at,ends_at,created_at")
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: false })
-        .limit(300);
+  const { data, error } = await supabase
+    .from("coupons")
+    .select("id,name,description,image_url,upc,redeem_type,active,sort_order,starts_at,ends_at,created_at,redeem_taps")
+    .order("redeem_taps", { ascending: false })   // ✅ most used (tapped) first
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false })
+    .limit(300);
 
-      if (error) throw error;
-      setRows((data as any) || []);
+    if (error) throw error;
+    setRows((data as any) || []);
     } catch (e: any) {
-      setStatus("Load error: " + (e?.message ?? String(e)));
+    setStatus("Load error: " + (e?.message ?? String(e)));
     }
-  }
+    }
 
   async function loadLog() {
     setLogStatus("");
