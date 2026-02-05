@@ -741,7 +741,7 @@ export default function MemberPage() {
       {/* Settings popup */}
       {settingsOpen && authUid && (
         <div className="overlay" onClick={() => setSettingsOpen(false)}>
-          <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
+          <div className="overlayCardScrollable" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
               <div className="title">Settings</div>
               <button type="button" className="xBtn" onClick={() => setSettingsOpen(false)}>×</button>

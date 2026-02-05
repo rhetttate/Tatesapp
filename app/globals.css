@@ -367,3 +367,17 @@ img{
 @media (max-width: 760px){
   .kioskGrid{ grid-template-columns: 1fr; }
 }
+
+/* Scrollable overlay card (for settings + signup) */
+.overlayCardScrollable {
+  width: min(560px, 95vw);
+  max-height: calc(100vh - 48px); /* key line */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+
+  background: #fff;
+  border-radius: 22px;
+  padding: 18px;
+  border: 1px solid rgba(29,78,216,0.14);
+  box-shadow: 0 18px 50px rgba(10,42,122,0.18);
+}
