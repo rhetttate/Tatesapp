@@ -3,11 +3,29 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { supabase } from "../../lib/supabase";
 import TopNav from "../components/topnav";
 
+// ---------- helpers ----------
+function digitsOnly(s: string) {
+  return (s || "").replace(/\D/g, "");
+}
+
+// Basic US E.164 normalizer (good enough for now; later you can swap to libphonenumber)
+function toE164US(raw: string): string | null {
+  const d = digitsOnly(raw);
+  if (!d) return null;
+  if (d.length === 10) return "+1" + d;
+  if (d.length === 11 && d.startsWith("1")) return "+" + d;
+  if (raw.trim().startsWith("+") && d.length >= 10) return "+" + d;
+  return null;
+}
+
 export default function MemberPage() {
+  const router = useRouter();
+
   // auth
   const [authUid, setAuthUid] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -15,10 +33,12 @@ export default function MemberPage() {
 
   // signup extras
   const [signupOpen, setSignupOpen] = useState(false);
+  const [name, setName] = useState(""); // ✅ NEW
   const [phone, setPhone] = useState("");
   const [smsOptIn, setSmsOptIn] = useState(false);
 
   // prevent overwriting while user edits
+  const [nameDirty, setNameDirty] = useState(false);
   const [phoneDirty, setPhoneDirty] = useState(false);
   const [smsDirty, setSmsDirty] = useState(false);
 
@@ -27,6 +47,7 @@ export default function MemberPage() {
   // member data
   const [memberUuid, setMemberUuid] = useState<string | null>(null);
   const [points, setPoints] = useState<number>(0);
+  const pointsRef = useRef<number>(0);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
   // connection state
@@ -59,7 +80,9 @@ export default function MemberPage() {
 
     if (error) throw error;
 
-    setPoints(Number((data as any)?.points ?? 0));
+    const p = Number((data as any)?.points ?? 0);
+    setPoints(p);
+    pointsRef.current = p;
 
     // Build QR once per member UUID (cashier scans member UUID)
     if (qrBuiltFor.current !== id) {
@@ -70,18 +93,19 @@ export default function MemberPage() {
   }
 
   // ----------------------------
-  // Load phone settings
+  // Load phone/name settings from members
   // ----------------------------
-  async function loadPhoneSettingsById(id: string) {
+  async function loadMemberSettingsById(id: string) {
     const { data, error } = await supabase
       .from("members")
-      .select("phone, sms_opt_in")
+      .select("name, phone, phone_e164, sms_opt_in")
       .eq("id", id)
       .single();
 
     if (error) throw error;
 
-    if (!phoneDirty) setPhone(((data as any)?.phone ?? "") as string);
+    if (!nameDirty) setName(((data as any)?.name ?? "") as string);
+    if (!phoneDirty) setPhone((((data as any)?.phone ?? "") as string) || "");
     if (!smsDirty) setSmsOptIn(!!(data as any)?.sms_opt_in);
   }
 
@@ -114,7 +138,8 @@ export default function MemberPage() {
       setConnectedTablet(isConnected ? (row.tablet_id as string) : null);
       setLastSeenMsAgo(msAgo);
 
-      if (isConnected && points > 0) setRedeemSheetOpen(true);
+      // Open redeem sheet automatically only when connected and points > 0
+      if (isConnected && pointsRef.current > 0) setRedeemSheetOpen(true);
 
       if (!isConnected) {
         setRedeemSheetOpen(false);
@@ -130,35 +155,50 @@ export default function MemberPage() {
   }
 
   // ----------------------------
-  // Ensure member exists for auth user
+  // Clear all local state on logout/no-session
   // ----------------------------
-  async function ensureMemberAndLoad() {
-    const { data: sess } = await supabase.auth.getSession();
-    const uid = sess.session?.user?.id ?? null;
+  function clearLocalStateForLoggedOut() {
+    setAuthUid(null);
+
+    setMemberUuid(null);
+    setPoints(0);
+    pointsRef.current = 0;
+
+    setQrUrl(null);
+    qrBuiltFor.current = null;
+
+    setConnected(false);
+    setConnectedTablet(null);
+    setLastSeenMsAgo(null);
+    setRedeemSheetOpen(false);
+
+    // reset editable fields (but keep email typed if you want; leaving as-is is fine)
+    setName("");
+    setNameDirty(false);
+
+    setPhone("");
+    setSmsOptIn(false);
+    setPhoneDirty(false);
+    setSmsDirty(false);
+
+    setSettingsOpen(false);
+    setResetStatus("");
+    setRedeemStatus("");
+  }
+
+  // ----------------------------
+  // Ensure member exists for auth user (SESSION-DRIVEN)
+  // ----------------------------
+  async function ensureMemberAndLoadWithSession(session: any | null) {
+    const uid = session?.user?.id ?? null;
     setAuthUid(uid);
 
     if (!uid) {
-      setMemberUuid(null);
-      setPoints(0);
-      setQrUrl(null);
-      qrBuiltFor.current = null;
-
-      setConnected(false);
-      setConnectedTablet(null);
-      setLastSeenMsAgo(null);
-      setRedeemSheetOpen(false);
-
-      setPhone("");
-      setSmsOptIn(false);
-      setPhoneDirty(false);
-      setSmsDirty(false);
-
-      setSettingsOpen(false);
-      setResetStatus("");
-      setRedeemStatus("");
+      clearLocalStateForLoggedOut();
       return;
     }
 
+    // Ensure member row exists and get member token/id
     const { data: memberId, error } = await supabase.rpc("ensure_member_for_auth_user");
     if (error) {
       setRedeemStatus("Account setup error: " + error.message);
@@ -168,32 +208,53 @@ export default function MemberPage() {
     const id = memberId as string;
     setMemberUuid(id);
 
+    // reset "dirty" so DB values can populate after login
+    setNameDirty(false);
     setPhoneDirty(false);
     setSmsDirty(false);
 
+    // Sync name/email from auth metadata into members table (non-blocking)
+    try {
+      const authName = (session?.user?.user_metadata?.name as string | undefined)?.trim() ?? "";
+      const authEmail = (session?.user?.email as string | undefined)?.trim() ?? "";
+
+      const patch: any = { updated_at: new Date().toISOString() };
+
+      if (authName) patch.name = authName;
+      if (authEmail) patch.email = authEmail;
+
+      // Only send update if we actually have something to write
+      if (patch.name || patch.email) {
+        await supabase.from("members").update(patch).eq("id", id);
+      }
+    } catch {
+      // ignore; do not block app
+    }
+
     await loadPointsById(id);
-    await loadPhoneSettingsById(id);
+    await loadMemberSettingsById(id);
   }
 
   // ----------------------------
-  // Boot + auth listener
+  // Boot + auth listener (session-first; no stale getSession reliance)
   // ----------------------------
   useEffect(() => {
     let alive = true;
 
     (async () => {
       try {
+        const { data } = await supabase.auth.getSession();
         if (!alive) return;
-        await ensureMemberAndLoad();
+        await ensureMemberAndLoadWithSession(data.session ?? null);
       } catch (e: any) {
         setRedeemStatus("Init error: " + (e?.message ?? String(e)));
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async () => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!alive) return;
       try {
-        await ensureMemberAndLoad();
+        await ensureMemberAndLoadWithSession(session);
       } catch (e: any) {
         setRedeemStatus("Auth error: " + (e?.message ?? String(e)));
       }
@@ -221,6 +282,7 @@ export default function MemberPage() {
 
     tick();
     const t = setInterval(tick, 2500);
+
     return () => {
       alive = false;
       clearInterval(t);
@@ -228,7 +290,7 @@ export default function MemberPage() {
   }, [memberUuid]);
 
   // ----------------------------
-  // Poll: connection freshness
+  // Poll: connection freshness (NOT dependent on points)
   // ----------------------------
   useEffect(() => {
     if (!memberUuid) return;
@@ -241,12 +303,13 @@ export default function MemberPage() {
 
     tick();
     const t = setInterval(tick, POLL_MS);
+
     return () => {
       alive = false;
       clearInterval(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memberUuid, points]);
+  }, [memberUuid]);
 
   // ----------------------------
   // Auth actions
@@ -255,12 +318,20 @@ export default function MemberPage() {
     setRedeemStatus("");
     setResetStatus("");
     setAuthBusy(true);
+
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
-      if (error) setRedeemStatus(error.message);
+
+      if (error) {
+        setRedeemStatus(error.message);
+        return;
+      }
+
+      // ✅ Immediate session-driven load (no "waiting for listener")
+      await ensureMemberAndLoadWithSession(data.session ?? null);
     } catch (e: any) {
       setRedeemStatus("Sign in error: " + (e?.message ?? String(e)));
     } finally {
@@ -272,23 +343,37 @@ export default function MemberPage() {
     setRedeemStatus("");
     setResetStatus("");
     setAuthBusy(true);
+
     try {
+      const cleanName = name.trim();
+      if (!cleanName) {
+        setRedeemStatus("Please enter your name.");
+        return;
+      }
+
+      const cleanPhone = phone.trim();
+      const phoneE164 = cleanPhone ? toE164US(cleanPhone) : null;
+
       const { error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
           data: {
-            phone: phone.trim(),
+            name: cleanName, // ✅ NEW
+            phone: cleanPhone || null,
+            phone_e164: phoneE164,
             sms_opt_in: smsOptIn,
           },
         },
       });
 
-      if (error) setRedeemStatus(error.message);
-      else {
-        setRedeemStatus("Account created. Now sign in.");
-        setSignupOpen(false);
+      if (error) {
+        setRedeemStatus(error.message);
+        return;
       }
+
+      setRedeemStatus("Account created. Now sign in.");
+      setSignupOpen(false);
     } catch (e: any) {
       setRedeemStatus("Sign up error: " + (e?.message ?? String(e)));
     } finally {
@@ -300,64 +385,96 @@ export default function MemberPage() {
     setRedeemStatus("");
     setResetStatus("");
     setAuthBusy(true);
+
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) setRedeemStatus(error.message);
+      if (error) {
+        setRedeemStatus(error.message);
+        return;
+      }
+
+      // ✅ Clear UI immediately (no refresh needed)
+      await ensureMemberAndLoadWithSession(null);
+
+      // ✅ App-router navigation
+      router.replace("/");
+      router.refresh();
     } catch (e: any) {
       setRedeemStatus("Sign out error: " + (e?.message ?? String(e)));
     } finally {
       setAuthBusy(false);
-      window.location.href = "/";
     }
   }
 
-  async function savePhoneSettings() {
+  async function saveMemberSettings() {
     setRedeemStatus("");
     try {
       if (!memberUuid) throw new Error("Not signed in.");
 
-      const { error } = await supabase
+      // read current opt-in timestamps so we don't wipe them
+      const { data: current, error: readErr } = await supabase
         .from("members")
-        .update({
-          phone: phone.trim() || null,
-          sms_opt_in: smsOptIn,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", memberUuid);
+        .select("sms_opt_in_at, sms_opt_in_source")
+        .eq("id", memberUuid)
+        .single();
 
+      if (readErr) throw readErr;
+
+      const nowIso = new Date().toISOString();
+      const cleanName = name.trim() || null;
+
+      const cleanPhone = phone.trim() || null;
+      const phoneE164 = cleanPhone ? toE164US(cleanPhone) : null;
+
+      const patch: any = {
+        name: cleanName,
+        phone: cleanPhone,
+        phone_e164: phoneE164,
+        sms_opt_in: smsOptIn,
+        updated_at: nowIso,
+      };
+
+      // Only set opt-in timestamp when turning ON and it's not already set
+      if (smsOptIn) {
+        patch.sms_opt_in_at = (current as any)?.sms_opt_in_at ?? nowIso;
+        patch.sms_opt_in_source = (current as any)?.sms_opt_in_source ?? "member_settings";
+      }
+
+      const { error } = await supabase.from("members").update(patch).eq("id", memberUuid);
       if (error) throw error;
 
+      setNameDirty(false);
       setPhoneDirty(false);
       setSmsDirty(false);
-      setRedeemStatus("Saved ✅");
 
-      await loadPhoneSettingsById(memberUuid);
+      setRedeemStatus("Saved ✅");
+      await loadMemberSettingsById(memberUuid);
     } catch (e: any) {
       setRedeemStatus("Save error: " + (e?.message ?? String(e)));
     }
   }
 
   async function sendReset(emailOverride?: string) {
-  setResetStatus("");
-  setRedeemStatus("");
-  setResetBusy(true);
-  try {
-    const em = (emailOverride ?? email).trim();
-    if (!em) throw new Error("Enter your email first.");
+    setResetStatus("");
+    setRedeemStatus("");
+    setResetBusy(true);
+    try {
+      const em = (emailOverride ?? email).trim();
+      if (!em) throw new Error("Enter your email first.");
 
-    const site = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
-    const redirectTo = `${site}/reset`;
+      const site = (process.env.NEXT_PUBLIC_SITE_URL || window.location.origin).replace(/\/$/, "");
+      const redirectTo = `${site}/reset`;
 
-    const { error } = await supabase.auth.resetPasswordForEmail(em, { redirectTo });
-    if (error) throw error;
+      const { error } = await supabase.auth.resetPasswordForEmail(em, { redirectTo });
+      if (error) throw error;
 
-    setResetStatus("Reset email sent ✅ Check your inbox.");
-  } catch (e: any) {
-    setResetStatus("Reset error: " + (e?.message ?? String(e)));
-  } finally {
-    setResetBusy(false);
+      setResetStatus("Reset email sent ✅ Check your inbox.");
+    } catch (e: any) {
+      setResetStatus("Reset error: " + (e?.message ?? String(e)));
+    } finally {
+      setResetBusy(false);
+    }
   }
-}
 
   // ----------------------------
   // Redeem request
@@ -367,7 +484,7 @@ export default function MemberPage() {
     try {
       if (!memberUuid) throw new Error("Not signed in.");
       if (!connected) throw new Error("Not connected to cashier tablet.");
-      if (points <= 0) throw new Error("No points to redeem.");
+      if (pointsRef.current <= 0) throw new Error("No points to redeem.");
 
       setRedeeming(true);
 
@@ -575,7 +692,7 @@ export default function MemberPage() {
                 type="button"
                 onClick={() => {
                   setSettingsOpen(true);
-                  if (memberUuid) loadPhoneSettingsById(memberUuid).catch(() => {});
+                  if (memberUuid) loadMemberSettingsById(memberUuid).catch(() => {});
                 }}
                 aria-label="Settings"
                 style={{
@@ -632,10 +749,21 @@ export default function MemberPage() {
 
             <div className="divider" />
 
-            <div className="title" style={{ fontSize: 18 }}>Phone Settings</div>
+            <div className="title" style={{ fontSize: 18 }}>Profile</div>
             <div className="muted" style={{ marginTop: 6 }}>
-              Add or update your phone anytime. SMS consent is optional.
+              Update your info anytime.
             </div>
+
+            <input
+              className="input"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameDirty(true);
+              }}
+              autoComplete="name"
+            />
 
             <input
               className="input"
@@ -659,21 +787,20 @@ export default function MemberPage() {
                 style={{ marginTop: 4 }}
               />
               <span className="muted" style={{ fontSize: 13, lineHeight: 1.35 }}>
-              Optional: I agree to receive SMS messages from Tate’s Supermarket (promotional and informational).
-              Message frequency may vary. Message &amp; data rates may apply. Reply <b>STOP</b> to opt out at any time.
-              Reply <b>HELP</b> for assistance or visit{" "}
-              <a href="https://www.tatessupermarket.com" target="_blank" rel="noreferrer">
-                https://www.tatessupermarket.com
-              </a>
-              . See <Link href="/privacy">Privacy Policy</Link> for privacy policy and SMS terms. SMS consent is not shared with
-              third parties or affiliates.
-            </span>
-
+                Optional: I agree to receive SMS messages from Tate’s Supermarket (promotional and informational).
+                Message frequency may vary. Message &amp; data rates may apply. Reply <b>STOP</b> to opt out at any time.
+                Reply <b>HELP</b> for assistance or visit{" "}
+                <a href="https://www.tatessupermarket.com" target="_blank" rel="noreferrer">
+                  https://www.tatessupermarket.com
+                </a>
+                . See <Link href="/privacy">Privacy Policy</Link> for privacy policy and SMS terms. SMS consent is not shared with
+                third parties or affiliates.
+              </span>
             </label>
 
             <div className="btnRow">
-              <button type="button" className="btn btnPrimary" onClick={savePhoneSettings} style={{ flex: 1 }}>
-                Save Phone
+              <button type="button" className="btn btnPrimary" onClick={saveMemberSettings} style={{ flex: 1 }}>
+                Save
               </button>
             </div>
 
@@ -725,8 +852,19 @@ export default function MemberPage() {
             </div>
 
             <div className="muted" style={{ marginTop: 6 }}>
-              Phone + SMS consent are optional.
+              Name is required. Phone + SMS consent are optional.
             </div>
+
+            <input
+              className="input"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameDirty(true);
+              }}
+              autoComplete="name"
+            />
 
             <input
               className="input"
@@ -765,16 +903,15 @@ export default function MemberPage() {
                 style={{ marginTop: 4 }}
               />
               <span className="muted" style={{ fontSize: 13, lineHeight: 1.35 }}>
-              Optional: I agree to receive SMS messages from Tate’s Supermarket (promotional and informational).
-              Message frequency may vary. Message &amp; data rates may apply. Reply <b>STOP</b> to opt out at any time.
-              Reply <b>HELP</b> for assistance or visit{" "}
-              <a href="https://www.tatessupermarket.com" target="_blank" rel="noreferrer">
-                https://www.tatessupermarket.com
-              </a>
-              . See <Link href="/privacy">Privacy Policy</Link> for privacy policy and SMS terms. SMS consent is not shared with
-              third parties or affiliates.
-            </span>
-
+                Optional: I agree to receive SMS messages from Tate’s Supermarket (promotional and informational).
+                Message frequency may vary. Message &amp; data rates may apply. Reply <b>STOP</b> to opt out at any time.
+                Reply <b>HELP</b> for assistance or visit{" "}
+                <a href="https://www.tatessupermarket.com" target="_blank" rel="noreferrer">
+                  https://www.tatessupermarket.com
+                </a>
+                . See <Link href="/privacy">Privacy Policy</Link> for privacy policy and SMS terms. SMS consent is not shared with
+                third parties or affiliates.
+              </span>
             </label>
 
             <div className="btnRow">
@@ -826,7 +963,7 @@ export default function MemberPage() {
                 className="sheetBtn"
                 type="button"
                 onClick={requestRedeem}
-                disabled={!connected || points <= 0 || redeeming}
+                disabled={!connected || pointsRef.current <= 0 || redeeming}
               >
                 {redeeming ? "Requesting…" : `Redeem ${points} Points`}
               </button>
@@ -849,3 +986,4 @@ export default function MemberPage() {
     </div>
   );
 }
+
