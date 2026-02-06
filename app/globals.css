@@ -53,7 +53,6 @@ img{
    Horizontal swipe rows
    ================================ */
 
-/* breaks swipe row OUT of side padding */
 .swipeBleed{
   margin-left: calc(var(--pagePad) * -1);
   margin-right: calc(var(--pagePad) * -1);
@@ -62,7 +61,6 @@ img{
   overflow: visible;
 }
 
-/* row scrolls sideways */
 .swipeRow, .hscroll{
   display: flex;
   gap: 12px;
@@ -70,25 +68,26 @@ img{
   overflow-y: hidden;
   padding: 2px 0 12px;
   -webkit-overflow-scrolling: touch;
-
-  /* do NOT block vertical scrolling */
   touch-action: pan-x pan-y;
-
   scrollbar-width: none;
 }
+
 .swipeRow::-webkit-scrollbar,
 .hscroll::-webkit-scrollbar{ display:none; }
 
-/* optional “caps” for centered look */
 .swipeStartCap,
 .swipeEndCap{
   flex: 0 0 calc((100vw - min(1100px, 100vw)) / 2);
   pointer-events: none;
 }
+
 @media (max-width: 420px){
   .swipeStartCap,
-  .swipeEndCap{ flex: 0 0 12px; }
+  .swipeEndCap{
+    flex: 0 0 12px;
+  }
 }
+
 .swipeEndCap{ width: 10px; flex: 0 0 auto; }
 
 /* ================================
@@ -102,21 +101,18 @@ img{
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #ffffff;
-
-  /* keep image clipped to card */
   overflow: hidden;
-
   display: grid;
   box-shadow: none;
 }
 
-/* mobile width */
 @media (max-width: 420px){
   .dealCard,
-  .dealCardCompact{ width: 86vw; }
+  .dealCardCompact{
+    width: 86vw;
+  }
 }
 
-/* image must fit */
 .dealImg,
 .dealImgCompact{
   height: 180px;
@@ -135,12 +131,14 @@ img{
   color: #0a2a7a;
   line-height: 1.12;
 }
+
 .dealDesc{
   color: rgba(10,42,122,0.70);
   font-weight: 800;
   font-size: 14px;
   line-height: 1.22;
 }
+
 .dealPrice{
   font-weight: 950;
   font-size: 22px;
@@ -154,36 +152,39 @@ img{
 
 .card{
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 18px;
+  border:1px solid var(--border);
+  border-radius:18px;
   box-shadow: none;
 }
 
 .btn{
-  border: 1px solid var(--border);
-  background: #fff;
-  padding: 10px 14px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 800;
+  border:1px solid var(--border);
+  background:#fff;
+  padding:10px 14px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:800;
 }
+
 .btnPrimary{
   background: linear-gradient(180deg, var(--blue), var(--blue2));
-  color: #fff;
+  color:#fff;
   border-color: rgba(29,78,216,.35);
 }
-.btn:disabled{ opacity: .6; cursor: not-allowed; }
+
+.btn:disabled{ opacity:.6; cursor:not-allowed; }
 
 .input{
-  width: 100%;
-  padding: 12px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  outline: none;
-  background: #fff;
-  font-size: 16px;
-  font-weight: 800;
+  width:100%;
+  padding:12px 12px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  outline:none;
+  background:#fff;
+  font-size:16px;
+  font-weight:800;
 }
+
 .input:focus{
   border-color: rgba(37,99,235,.45);
   box-shadow: 0 0 0 4px rgba(37,99,235,.12);
@@ -237,14 +238,13 @@ img{
 
 /* ================================
    Scrollable overlay card
-   Used by Member page modals
    ================================ */
-.overlayCardScrollable{
+
+.overlayCardScrollable {
   width: min(560px, 95vw);
   max-height: calc(100vh - 48px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-
   background: #fff;
   border-radius: 22px;
   padding: 18px;
