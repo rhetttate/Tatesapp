@@ -43,7 +43,6 @@ img{
    Page layout helpers
    ================================ */
 
-/* Use this on your Deals page wrapper if you want consistency */
 .pageInner{
   max-width: 980px;
   margin: 0 auto;
@@ -54,7 +53,6 @@ img{
    Horizontal swipe rows
    ================================ */
 
-/* This is the magic: it breaks the swipe row OUT of side padding */
 .swipeBleed{
   margin-left: calc(var(--pagePad) * -1);
   margin-right: calc(var(--pagePad) * -1);
@@ -63,7 +61,6 @@ img{
   overflow: visible;
 }
 
-/* The row scrolls sideways */
 .swipeRow, .hscroll{
   display: flex;
   gap: 12px;
@@ -71,28 +68,21 @@ img{
   overflow-y: hidden;
   padding: 2px 0 12px;
   -webkit-overflow-scrolling: touch;
-
-  /* do NOT block vertical scrolling */
   touch-action: pan-x pan-y;
-
   scrollbar-width: none;
 }
 .swipeRow::-webkit-scrollbar,
 .hscroll::-webkit-scrollbar{ display:none; }
 
-/* Centers the first card while still allowing bleed */
 .swipeStartCap,
 .swipeEndCap{
   flex: 0 0 calc((100vw - min(1100px, 100vw)) / 2);
   pointer-events: none;
 }
 
-/* Mobile tweak so it doesn’t over-center */
 @media (max-width: 420px){
   .swipeStartCap,
-  .swipeEndCap{
-    flex: 0 0 12px;
-  }
+  .swipeEndCap{ flex: 0 0 12px; }
 }
 
 .swipeEndCap{ width: 10px; flex: 0 0 auto; }
@@ -108,23 +98,16 @@ img{
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #ffffff;
-
-  /* keep the image clipped to the card */
   overflow: hidden;
-
   display: grid;
   box-shadow: none;
 }
 
-/* mobile width */
 @media (max-width: 420px){
   .dealCard,
-  .dealCardCompact{
-    width: 86vw;
-  }
+  .dealCardCompact{ width: 86vw; }
 }
 
-/* image must fit */
 .dealImg,
 .dealImgCompact{
   height: 180px;
@@ -243,138 +226,12 @@ img{
 .tab{ text-decoration: none; color: #94a3b8; padding-bottom: 6px; }
 .tabActive{ color: #1d4ed8; border-bottom: 3px solid #1d4ed8; }
 
-/* ================================
-   Kiosk (leave as-is)
-   ================================ */
-/* ================================
-   ✅ Kiosk (Cashier UI)
-   Always fits on screen.
-   Only the panel scrolls.
-   ================================ */
-
-/* Fullscreen shell */
-.kioskRoot{
-  height: 100svh;          /* modern mobile/tablet */
-  height: 100vh;           /* fallback */
-  width: 100vw;
-  overflow: hidden;
-  background: #f3f7ff;
-}
-
-/* Column layout */
-.kioskWrap{
-  height: 100%;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
-  gap: 12px;
-  box-sizing: border-box;
-}
-
-/* Fixed header */
-.kioskTopbar{
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: #ffffff;
-  border: 1px solid rgba(29,78,216,0.14);
-  box-shadow: 0 8px 24px rgba(10,42,122,0.06);
-}
-
-/* Brand (left) */
-.kioskBrand{
-  font-weight: 950;
-  color: #0a2a7a;
-  font-size: 18px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  min-width: 0;
-}
-.kioskLogo{
-  height: 34px;
-  width: auto;
-  object-fit: contain;
-  display: block;
-}
-.dot{
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: #1d4ed8;
-  display: inline-block;
-}
-.pill{
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: rgba(29,78,216,0.10);
-  color: #1d4ed8;
-  font-weight: 950;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-/* Actions (right) */
-.kioskActions{
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex: 0 0 auto;
-}
-
-/* Scrollable panel */
-.kioskPanel{
-  flex: 1 1 auto;
-  min-height: 0;           /* ✅ critical inside flex */
-  background: #fff;
-  border: 1px solid rgba(29,78,216,0.14);
-  border-radius: 22px;
-  box-shadow: 0 8px 24px rgba(10,42,122,0.06);
-  padding: 14px;
-  overflow: auto;          /* ✅ only this scrolls */
-}
-
-/* Basic kiosk text */
-.kioskTitle{ font-size: 20px; font-weight: 950; color: #0a2a7a; }
-.kioskMuted{ color: rgba(10,42,122,0.65); font-weight: 850; margin-top: 4px; }
-
-/* Kiosk buttons */
-.kioskBtn{
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 0;
-  font-weight: 950;
-  cursor: pointer;
-  background: #e8efff;
-  color: #1d4ed8;
-}
-.kioskBtn.primary{ background: #1d4ed8; color: #fff; }
-.kioskBtn.danger{ background: #fee2e2; color: #991b1b; }
-
-/* Inside-panel helpers */
-.kioskHr{ height: 1px; background: rgba(29,78,216,0.12); margin: 14px 0; }
-
-.kioskGrid{
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 12px;
-}
-@media (max-width: 760px){
-  .kioskGrid{ grid-template-columns: 1fr; }
-}
-
-/* Scrollable overlay card (for settings + signup) */
+/* Keep overlayCardScrollable here because Member uses it */
 .overlayCardScrollable {
   width: min(560px, 95vw);
-  max-height: calc(100vh - 48px); /* key line */
+  max-height: calc(100vh - 48px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-
   background: #fff;
   border-radius: 22px;
   padding: 18px;
@@ -383,16 +240,12 @@ img{
 }
 /* ============================
    SALE FULLSCREEN MODE (AUTO-FIT)
-   matches: kioskWrap / topBar / main / pane / saleGrid
+   - fills screen with 1..8 items
+   - looks great with ~4 items
+   - bottom lifted ~1/2 inch
    ============================ */
-
-.saleMode .topBar{
-  display: none !important;
-}
-
-.saleMode .main{
-  margin-top: 0 !important;
-}
+.saleMode .topBar { display: none !important; }
+.saleMode .main { margin-top: 0 !important; }
 
 .saleMode .pane{
   padding: 10px !important;
@@ -403,16 +256,17 @@ img{
 }
 
 /* Hide title to gain space */
-.saleMode .saleTitle{
-  display: none !important;
-}
+.saleMode .saleTitle{ display: none !important; }
 
-/* Auto-fit sale grid */
+/* Auto-fit grid that fills remaining space */
 .saleMode .saleGrid{
+  margin-top: 0 !important;
+
   flex: 1;
   min-height: 0;
 
-  padding-bottom: 48px; /* ~1/2 inch lift */
+  /* lift bottom ~1/2 inch */
+  padding-bottom: 48px;
 
   display: grid;
   gap: 12px;
@@ -422,12 +276,12 @@ img{
   grid-auto-flow: dense;
 
   align-content: stretch;
+  overflow: hidden;
 }
 
-/* Cards fill their cell */
 .saleMode .saleCard{
   height: 100%;
-  min-height: 0;
+  min-height: 0 !important;
   padding: 12px;
 
   display: grid;
@@ -435,13 +289,11 @@ img{
   gap: 10px;
 }
 
-/* Typography boost */
 .saleMode .saleName{ font-size: 20px; }
 .saleMode .salePrice{ font-size: 28px; }
 .saleMode .saleUpc{ font-size: 13px; }
 
-/* Barcode sizing */
+/* Barcode sizing in fullscreen */
 .saleMode .saleCard canvas{
   height: 140px !important;
 }
-
