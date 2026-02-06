@@ -53,6 +53,7 @@ img{
    Horizontal swipe rows
    ================================ */
 
+/* breaks swipe row OUT of side padding */
 .swipeBleed{
   margin-left: calc(var(--pagePad) * -1);
   margin-right: calc(var(--pagePad) * -1);
@@ -61,6 +62,7 @@ img{
   overflow: visible;
 }
 
+/* row scrolls sideways */
 .swipeRow, .hscroll{
   display: flex;
   gap: 12px;
@@ -68,23 +70,25 @@ img{
   overflow-y: hidden;
   padding: 2px 0 12px;
   -webkit-overflow-scrolling: touch;
+
+  /* do NOT block vertical scrolling */
   touch-action: pan-x pan-y;
+
   scrollbar-width: none;
 }
 .swipeRow::-webkit-scrollbar,
 .hscroll::-webkit-scrollbar{ display:none; }
 
+/* optional “caps” for centered look */
 .swipeStartCap,
 .swipeEndCap{
   flex: 0 0 calc((100vw - min(1100px, 100vw)) / 2);
   pointer-events: none;
 }
-
 @media (max-width: 420px){
   .swipeStartCap,
   .swipeEndCap{ flex: 0 0 12px; }
 }
-
 .swipeEndCap{ width: 10px; flex: 0 0 auto; }
 
 /* ================================
@@ -98,16 +102,21 @@ img{
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #ffffff;
+
+  /* keep image clipped to card */
   overflow: hidden;
+
   display: grid;
   box-shadow: none;
 }
 
+/* mobile width */
 @media (max-width: 420px){
   .dealCard,
   .dealCardCompact{ width: 86vw; }
 }
 
+/* image must fit */
 .dealImg,
 .dealImgCompact{
   height: 180px;
@@ -145,35 +154,35 @@ img{
 
 .card{
   background: var(--card);
-  border:1px solid var(--border);
-  border-radius:18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
   box-shadow: none;
 }
 
 .btn{
-  border:1px solid var(--border);
-  background:#fff;
-  padding:10px 14px;
-  border-radius:12px;
-  cursor:pointer;
-  font-weight:800;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 800;
 }
 .btnPrimary{
   background: linear-gradient(180deg, var(--blue), var(--blue2));
-  color:#fff;
+  color: #fff;
   border-color: rgba(29,78,216,.35);
 }
-.btn:disabled{ opacity:.6; cursor:not-allowed; }
+.btn:disabled{ opacity: .6; cursor: not-allowed; }
 
 .input{
-  width:100%;
-  padding:12px 12px;
-  border-radius:12px;
-  border:1px solid var(--border);
-  outline:none;
-  background:#fff;
-  font-size:16px;
-  font-weight:800;
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  outline: none;
+  background: #fff;
+  font-size: 16px;
+  font-weight: 800;
 }
 .input:focus{
   border-color: rgba(37,99,235,.45);
@@ -226,74 +235,19 @@ img{
 .tab{ text-decoration: none; color: #94a3b8; padding-bottom: 6px; }
 .tabActive{ color: #1d4ed8; border-bottom: 3px solid #1d4ed8; }
 
-/* Keep overlayCardScrollable here because Member uses it */
-.overlayCardScrollable {
+/* ================================
+   Scrollable overlay card
+   Used by Member page modals
+   ================================ */
+.overlayCardScrollable{
   width: min(560px, 95vw);
   max-height: calc(100vh - 48px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+
   background: #fff;
   border-radius: 22px;
   padding: 18px;
   border: 1px solid rgba(29,78,216,0.14);
   box-shadow: 0 18px 50px rgba(10,42,122,0.18);
-}
-/* ============================
-   SALE FULLSCREEN MODE (AUTO-FIT)
-   - fills screen with 1..8 items
-   - looks great with ~4 items
-   - bottom lifted ~1/2 inch
-   ============================ */
-.saleMode .topBar { display: none !important; }
-.saleMode .main { margin-top: 0 !important; }
-
-.saleMode .pane{
-  padding: 10px !important;
-  overflow: hidden !important;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Hide title to gain space */
-.saleMode .saleTitle{ display: none !important; }
-
-/* Auto-fit grid that fills remaining space */
-.saleMode .saleGrid{
-  margin-top: 0 !important;
-
-  flex: 1;
-  min-height: 0;
-
-  /* lift bottom ~1/2 inch */
-  padding-bottom: 48px;
-
-  display: grid;
-  gap: 12px;
-
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  grid-auto-rows: minmax(240px, 1fr);
-  grid-auto-flow: dense;
-
-  align-content: stretch;
-  overflow: hidden;
-}
-
-.saleMode .saleCard{
-  height: 100%;
-  min-height: 0 !important;
-  padding: 12px;
-
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 10px;
-}
-
-.saleMode .saleName{ font-size: 20px; }
-.saleMode .salePrice{ font-size: 28px; }
-.saleMode .saleUpc{ font-size: 13px; }
-
-/* Barcode sizing in fullscreen */
-.saleMode .saleCard canvas{
-  height: 140px !important;
 }
