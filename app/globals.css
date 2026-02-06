@@ -381,3 +381,67 @@ img{
   border: 1px solid rgba(29,78,216,0.14);
   box-shadow: 0 18px 50px rgba(10,42,122,0.18);
 }
+/* ============================
+   SALE FULLSCREEN MODE (AUTO-FIT)
+   matches: kioskWrap / topBar / main / pane / saleGrid
+   ============================ */
+
+.saleMode .topBar{
+  display: none !important;
+}
+
+.saleMode .main{
+  margin-top: 0 !important;
+}
+
+.saleMode .pane{
+  padding: 10px !important;
+  overflow: hidden !important;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hide title to gain space */
+.saleMode .saleTitle{
+  display: none !important;
+}
+
+/* Auto-fit sale grid */
+.saleMode .saleGrid{
+  flex: 1;
+  min-height: 0;
+
+  padding-bottom: 48px; /* ~1/2 inch lift */
+
+  display: grid;
+  gap: 12px;
+
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-auto-rows: minmax(240px, 1fr);
+  grid-auto-flow: dense;
+
+  align-content: stretch;
+}
+
+/* Cards fill their cell */
+.saleMode .saleCard{
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 10px;
+}
+
+/* Typography boost */
+.saleMode .saleName{ font-size: 20px; }
+.saleMode .salePrice{ font-size: 28px; }
+.saleMode .saleUpc{ font-size: 13px; }
+
+/* Barcode sizing */
+.saleMode .saleCard canvas{
+  height: 140px !important;
+}
+

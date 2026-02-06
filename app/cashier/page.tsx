@@ -747,7 +747,7 @@ export default function CashierPage() {
 
           {/* SALE TAB (fullscreen mode auto via saleMode) */}
           <div className={"pane " + (tab === TAB_SALE ? "paneActive" : "")}>
-            <div className="title">Sale Items</div>
+            <div className="title saleTitle">Sale Items</div>
 
             {saleLoading ? (
               <div className="statusBox" style={{ marginTop: 14 }}>
