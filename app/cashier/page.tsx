@@ -653,12 +653,28 @@ export default function CashierPage() {
 
         /* Fill the panel with 2x4 grid */
         .saleMode .saleGrid{
-          margin-top: 10px !important;
-          height: calc(100% - 40px);
-          grid-template-columns: repeat(4, 1fr);
-          grid-template-rows: repeat(2, 1fr);
-          gap: 12px;
+          margin-top: 0 !important;
+
+          flex: 1;
+          min-height: 0;
+
+          padding-bottom: 48px; /* lift bottom */
+
+          display: grid;
+
+          /* ✅ 2 columns always (so 6 items = 3 rows) */
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+
+          /* consistent row height */
+          grid-auto-rows: minmax(240px, 1fr);
+
+          /* more spacing */
+          gap: 18px;
+
+          align-content: stretch;
+          overflow: hidden;
         }
+
 
         .saleMode .saleCard{
           height: 100%;
