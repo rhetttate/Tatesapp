@@ -651,30 +651,53 @@ export default function CashierPage() {
           overflow: hidden !important;
         }
 
-        /* Fill the panel with 2x4 grid */
-        .saleMode .saleGrid{
-          margin-top: 0 !important;
+        /* Base: keep your current tile sizing */
+          .saleMode .saleGrid{
+            margin-top: 0 !important;
 
-          flex: 1;
-          min-height: 0;
+            flex: 1;
+            min-height: 0;
+            padding-bottom: 48px;
 
-          padding-bottom: 48px; /* lift bottom */
+            display: grid;
 
-          display: grid;
+            /* keep tiles same sizing */
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            grid-auto-rows: minmax(240px, 1fr);
+            grid-auto-flow: dense;
 
-          /* ✅ 2 columns always (so 6 items = 3 rows) */
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+            align-content: stretch;
+            overflow: hidden;
 
-          /* consistent row height */
-          grid-auto-rows: minmax(240px, 1fr);
+            /* default gap for 8 items */
+            gap: 12px;
+          }
 
-          /* more spacing */
-          gap: 18px;
+          /* ✅ If fewer than 8, give more breathing room */
+          .saleMode.saleCount1 .saleGrid,
+          .saleMode.saleCount2 .saleGrid,
+          .saleMode.saleCount3 .saleGrid,
+          .saleMode.saleCount4 .saleGrid,
+          .saleMode.saleCount5 .saleGrid,
+          .saleMode.saleCount6 .saleGrid,
+          .saleMode.saleCount7 .saleGrid{
+            gap: 20px;
+          }
 
-          align-content: stretch;
-          overflow: hidden;
-        }
+          /* Optional: if you want 6 or fewer to be even looser */
+          .saleMode.saleCount1 .saleGrid,
+          .saleMode.saleCount2 .saleGrid,
+          .saleMode.saleCount3 .saleGrid,
+          .saleMode.saleCount4 .saleGrid,
+          .saleMode.saleCount5 .saleGrid,
+          .saleMode.saleCount6 .saleGrid{
+            gap: 24px;
+          }
 
+          /* 8 items = tightest */
+          .saleMode.saleCount8 .saleGrid{
+            gap: 12px;
+          }
 
         .saleMode .saleCard{
           height: 100%;
@@ -688,7 +711,7 @@ export default function CashierPage() {
         .saleMode .saleUpc{ font-size: 13px; }
       `}</style>
 
-      <div className={"kioskWrap " + (saleMode ? "saleMode" : "")}>
+      <div className={"kioskWrap " + (saleMode ? "saleMode " : "") + "saleCount" + Math.min(8, sale.length)}>
         {/* TOP BAR (hidden in saleMode by CSS; still rendered okay) */}
         <div className="topBar">
           <div className="brand">
