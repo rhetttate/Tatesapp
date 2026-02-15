@@ -17,10 +17,19 @@ function showEmail(email: string | null | undefined) {
   return e.length ? e : "—";
 }
 
+function digitsOnly(s: string) {
+  return (s || "").replace(/\D/g, "");
+}
+
 export default function AdminMembersPage() {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<MemberRow[]>([]);
   const [status, setStatus] = useState("");
+
+  // inline edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [pointsDraft, setPointsDraft] = useState<string>("");
+  const [saving, setSaving] = useState(false);
 
   const query = useMemo(() => q.trim(), [q]);
 
@@ -34,7 +43,8 @@ export default function AdminMembersPage() {
         .limit(50);
 
       if (query) {
-        const looksUuid = query.length >= 8;
+        // UUID exact match attempt
+        const looksUuid = query.length >= 8 && /^[0-9a-fA-F-]+$/.test(query);
 
         if (looksUuid) {
           const { data: exact, error: exactErr } = await supabase
@@ -44,13 +54,13 @@ export default function AdminMembersPage() {
             .maybeSingle();
 
           if (exactErr) throw exactErr;
-
           if (exact) {
             setRows([exact as any]);
             return;
           }
         }
 
+        // name OR email partial match
         req = supabase
           .from("members")
           .select("id,name,email,points,created_at")
@@ -79,54 +89,136 @@ export default function AdminMembersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
+  function startEdit(m: MemberRow) {
+    setStatus("");
+    setEditingId(m.id);
+    setPointsDraft(String(m.points ?? 0));
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setPointsDraft("");
+  }
+
+  async function savePoints(memberId: string) {
+    setStatus("");
+    setSaving(true);
+    try {
+      const raw = pointsDraft.trim();
+      const clean = raw === "" ? "0" : digitsOnly(raw);
+      const pts = Number(clean);
+      if (!Number.isFinite(pts) || pts < 0) throw new Error("Points must be 0 or more.");
+
+      // optimistic update
+      setRows((prev) => prev.map((m) => (m.id === memberId ? { ...m, points: pts } : m)));
+
+      const { error } = await supabase.from("members").update({ points: pts }).eq("id", memberId);
+      if (error) throw error;
+
+      setEditingId(null);
+      setPointsDraft("");
+      setStatus("Points updated.");
+    } catch (e: any) {
+      setStatus("Update error: " + (e?.message ?? String(e)));
+      await load(); // resync if something failed
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="card" style={{ padding: 16, borderRadius: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
         <div>
           <div style={{ fontWeight: 950, fontSize: 22 }}>Members</div>
-          <div className="muted" style={{ marginTop: 6 }}>Search by name or email (or paste member UUID).</div>
+          <div className="muted" style={{ marginTop: 6 }}>
+            Search by <b>name</b> or <b>email</b> (or paste member UUID). Edit points inline.
+          </div>
         </div>
-        <button className="btn" onClick={load}>Refresh</button>
+        <button className="btn" onClick={load}>
+          Refresh
+        </button>
       </div>
 
       <div className="hr" />
 
-      <input
-        className="input"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search..."
-      />
+      <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, email, or UUID..." />
 
       {status && <p style={{ marginTop: 10 }}>{status}</p>}
 
       <div className="hr" />
 
       <div style={{ display: "grid", gap: 10 }}>
-        {rows.map((m) => (
-          <Link
-            key={m.id}
-            href={`/admin/members/${m.id}`}
-            className="card"
-            style={{ padding: 14, borderRadius: 16, textDecoration: "none" }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-              <div style={{ fontWeight: 950, fontSize: 18 }}>{m.name ?? "No name"}</div>
-              <div style={{ fontWeight: 950, fontSize: 18 }}>{m.points ?? 0} pts</div>
-            </div>
+        {rows.map((m) => {
+          const isEditing = editingId === m.id;
 
-            <div className="muted" style={{ marginTop: 6 }}>
-              {showEmail(m.email)}
-            </div>
+          return (
+            <div key={m.id} className="card" style={{ padding: 14, borderRadius: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                <div style={{ fontWeight: 950, fontSize: 18 }}>{m.name ?? "No name"}</div>
 
-            <div className="muted" style={{ marginTop: 6, fontSize: 12, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-              {m.id}
+                {!isEditing ? (
+                  <div style={{ fontWeight: 950, fontSize: 18 }}>{m.points ?? 0} pts</div>
+                ) : (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      className="input"
+                      style={{ width: 120, fontWeight: 950, textAlign: "right" }}
+                      value={pointsDraft}
+                      onChange={(e) => setPointsDraft(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="Points"
+                      disabled={saving}
+                    />
+                    <span className="muted" style={{ fontWeight: 900 }}>
+                      pts
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="muted" style={{ marginTop: 6 }}>
+                {showEmail(m.email)}
+              </div>
+
+              <div
+                className="muted"
+                style={{
+                  marginTop: 6,
+                  fontSize: 12,
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                }}
+              >
+                {m.id}
+              </div>
+
+              <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                <Link href={`/admin/members/${m.id}`} className="btn" style={{ textDecoration: "none" }}>
+                  Open
+                </Link>
+
+                {!isEditing ? (
+                  <button className="btn" onClick={() => startEdit(m)}>
+                    Edit Points
+                  </button>
+                ) : (
+                  <>
+                    <button className="btn btnPrimary" onClick={() => savePoints(m.id)} disabled={saving}>
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                    <button className="btn" onClick={cancelEdit} disabled={saving}>
+                      Cancel
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-          </Link>
-        ))}
+          );
+        })}
 
         {rows.length === 0 && !status && <div className="muted">No members found.</div>}
       </div>
     </div>
   );
 }
+
