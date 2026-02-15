@@ -18,6 +18,11 @@ type CouponRow = {
   ends_at: string | null;
   created_at: string;
   redeem_taps: number;
+
+  // ✅ new fields (from RPC)
+  redeemed_today?: number;
+  redeemed_week?: number;
+  redeemed_month?: number;
 };
 
 type RedemptionRow = {
@@ -31,6 +36,14 @@ type RedemptionRow = {
   source: string;
   coupons?: { name: string } | null;
 };
+
+type CouponStatsRow = {
+  coupon_id: string;
+  redeemed_today: number;
+  redeemed_week: number;
+  redeemed_month: number;
+};
+
 async function uploadCouponImage(file: File) {
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
   const path = `coupons/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
@@ -48,12 +61,11 @@ async function uploadCouponImage(file: File) {
 function digitsOnly(s: string) {
   return (s || "").replace(/\D/g, "");
 }
+
 function upcaCheckDigit(upc11: string) {
   const d = digitsOnly(upc11).slice(0, 11);
   if (d.length !== 11) return null;
 
-  // UPC-A: (sum odd positions * 3) + sum even positions
-  // positions are 1..11 from left
   let sumOdd = 0;
   let sumEven = 0;
 
@@ -73,17 +85,14 @@ function upcaCheckDigit(upc11: string) {
 function normalizeUpcA(input: string) {
   const d = digitsOnly(input);
 
-  // If they typed 11 digits, compute check digit
   if (d.length === 11) {
     const cd = upcaCheckDigit(d);
     if (cd == null) return d;
-    return d + cd; // 12 digits
+    return d + cd;
   }
 
-  // If they pasted 12 digits, keep first 12
   if (d.length >= 12) return d.slice(0, 12);
 
-  // Otherwise keep as-is (still typing)
   return d;
 }
 
@@ -146,20 +155,48 @@ export default function AdminCouponsPage() {
   async function load() {
     setStatus("");
     try {
-  const { data, error } = await supabase
-    .from("coupons")
-    .select("id,name,description,image_url,upc,redeem_type,active,sort_order,starts_at,ends_at,created_at,redeem_taps")
-    .order("redeem_taps", { ascending: false })   // ✅ most used (tapped) first
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: false })
-    .limit(300);
+      // 1) coupons
+      const { data: couponData, error: couponErr } = await supabase
+        .from("coupons")
+        .select(
+          "id,name,description,image_url,upc,redeem_type,active,sort_order,starts_at,ends_at,created_at,redeem_taps"
+        )
+        .order("redeem_taps", { ascending: false })
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false })
+        .limit(300);
 
-    if (error) throw error;
-    setRows((data as any) || []);
+      if (couponErr) throw couponErr;
+
+      // 2) stats (day/week/month counts per coupon)
+      const { data: statsData, error: statsErr } = await supabase.rpc("coupon_redemption_stats");
+      if (statsErr) throw new Error("Stats error: " + statsErr.message);
+
+      const statsMap = new Map<string, CouponStatsRow>();
+      ((statsData as any) || []).forEach((s: CouponStatsRow) => {
+        statsMap.set(s.coupon_id, {
+          coupon_id: s.coupon_id,
+          redeemed_today: Number(s.redeemed_today || 0),
+          redeemed_week: Number(s.redeemed_week || 0),
+          redeemed_month: Number(s.redeemed_month || 0),
+        });
+      });
+
+      const merged: CouponRow[] = ((couponData as any) || []).map((c: CouponRow) => {
+        const s = statsMap.get(c.id);
+        return {
+          ...c,
+          redeemed_today: s?.redeemed_today ?? 0,
+          redeemed_week: s?.redeemed_week ?? 0,
+          redeemed_month: s?.redeemed_month ?? 0,
+        };
+      });
+
+      setRows(merged);
     } catch (e: any) {
-    setStatus("Load error: " + (e?.message ?? String(e)));
+      setStatus("Load error: " + (e?.message ?? String(e)));
     }
-    }
+  }
 
   async function loadLog() {
     setLogStatus("");
@@ -183,61 +220,58 @@ export default function AdminCouponsPage() {
   }, []);
 
   useEffect(() => {
-  if (!open) return;
+    if (!open) return;
 
-  const prevHtmlOverflow = document.documentElement.style.overflow;
-  const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
 
-  document.documentElement.style.overflow = "hidden";
-  document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
 
-  return () => {
-    document.documentElement.style.overflow = prevHtmlOverflow;
-    document.body.style.overflow = prevBodyOverflow;
-  };
-}, [open]);
-
-  async function save() {setStatus("");
-  try {
-    // ✅ normalize: allow 11 digits (we auto add check digit in the input)
-    // but when saving we enforce 12 digits stored
-    const u = digitsOnly(upc).slice(0, 12);
-    if (u.length !== 12) {
-      throw new Error("UPC must be 11 digits (auto check digit) or 12 digits total.");
-    }
-
-    if (!name.trim()) throw new Error("Name required.");
-
-    const payload: any = {
-      name: name.trim(),
-      description: desc.trim(),
-      image_url: imageUrl.trim() || null,
-      upc: u, // ✅ 12-digit UPC-A
-      redeem_type: redeemType,
-      active,
-      sort_order: Number(sortOrder || 100),
-      starts_at: startsAt ? new Date(startsAt).toISOString() : null,
-      ends_at: endsAt ? new Date(endsAt).toISOString() : null,
-      updated_at: new Date().toISOString(),
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
     };
+  }, [open]);
 
-    if (editing) {
-      const { error } = await supabase.from("coupons").update(payload).eq("id", editing.id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase.from("coupons").insert(payload);
-      if (error) throw error;
+  async function save() {
+    setStatus("");
+    try {
+      const u = digitsOnly(upc).slice(0, 12);
+      if (u.length !== 12) throw new Error("UPC must be 11 digit (auto check digit) or 12 digits total.");
+      if (!name.trim()) throw new Error("Name required.");
+
+      const payload: any = {
+        name: name.trim(),
+        description: desc.trim(),
+        image_url: imageUrl.trim() || null,
+        upc: u,
+        redeem_type: redeemType,
+        active,
+        sort_order: Number(sortOrder || 100),
+        starts_at: startsAt ? new Date(startsAt).toISOString() : null,
+        ends_at: endsAt ? new Date(endsAt).toISOString() : null,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (editing) {
+        const { error } = await supabase.from("coupons").update(payload).eq("id", editing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("coupons").insert(payload);
+        if (error) throw error;
+      }
+
+      setOpen(false);
+      setEditing(null);
+      resetForm();
+
+      await load();
+      setStatus("Saved ✅");
+    } catch (e: any) {
+      setStatus("Save error: " + (e?.message ?? String(e)));
     }
-
-    setOpen(false);
-    setEditing(null);
-    resetForm();
-    await load();
-    setStatus("Saved ✅");
-  } catch (e: any) {
-    setStatus("Save error: " + (e?.message ?? String(e)));
-  }}
-    
+  }
 
   async function toggleActive(c: CouponRow) {
     setStatus("");
@@ -272,7 +306,7 @@ export default function AdminCouponsPage() {
         <div>
           <div style={{ fontWeight: 950, fontSize: 22 }}>Coupons</div>
           <div className="muted" style={{ marginTop: 6 }}>
-            Create coupons with barcode UPC + type (Daily or One-time). Redeems are logged.
+            Shows redeems per coupon (Today / This Week / This Month).
           </div>
         </div>
 
@@ -298,6 +332,14 @@ export default function AdminCouponsPage() {
             </div>
 
             <div className="muted" style={{ marginTop: 6 }}>{c.description}</div>
+
+            {/* ✅ NEW: Redemption counts */}
+            <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+              Redeemed:{" "}
+              <b>Today {c.redeemed_today ?? 0}</b> •{" "}
+              <b>Week {c.redeemed_week ?? 0}</b> •{" "}
+              <b>Month {c.redeemed_month ?? 0}</b>
+            </div>
 
             <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
               Type: <b>{c.redeem_type === "daily" ? "Reusable daily" : "One-time use"}</b> • Sort: <b>{c.sort_order}</b>
@@ -373,58 +415,57 @@ export default function AdminCouponsPage() {
             <textarea className="input" value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} />
 
             <label className="label" style={{ marginTop: 10 }}>Photo</label>
-           <input
-            type="file"
-            accept="image/*"
-            onChange={async (e) => {
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 try {
-                setStatus("Uploading image...");
-                const url = await uploadCouponImage(file);
-                setImageUrl(url);
-                setStatus("Image uploaded ✅");
+                  setStatus("Uploading image...");
+                  const url = await uploadCouponImage(file);
+                  setImageUrl(url);
+                  setStatus("Image uploaded ✅");
                 } catch (err: any) {
-                setStatus("Upload error: " + (err?.message ?? String(err)));
+                  setStatus("Upload error: " + (err?.message ?? String(err)));
                 } finally {
-                e.currentTarget.value = "";
+                  e.currentTarget.value = "";
                 }
-            }}
+              }}
             />
 
-
             <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-            Or paste an image URL:
+              Or paste an image URL:
             </div>
 
             <input
-            className="input"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://..."
+              className="input"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://..."
             />
 
             {imageUrl ? (
-            <div style={{ marginTop: 10 }}>
+              <div style={{ marginTop: 10 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={imageUrl} alt="preview" style={{ width: "100%", borderRadius: 14 }} />
-            </div>
+              </div>
             ) : null}
-
 
             <label className="label" style={{ marginTop: 10 }}>UPC-A</label>
             <input
-            className="input"
-            value={upc}
-            onChange={(e) => setUpc(normalizeUpcA(e.target.value))}
-            placeholder="Enter 11 digits (we'll add check digit)"
-            inputMode="numeric"
+              className="input"
+              value={upc}
+              onChange={(e) => setUpc(normalizeUpcA(e.target.value))}
+              placeholder="Enter 11 digits (we'll add check digit)"
+              inputMode="numeric"
             />
 
             <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-            Stored UPC (12 digits):{" "}
-            <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+              Stored UPC (12 digits):{" "}
+              <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
                 {digitsOnly(upc).slice(0, 12)}
-            </span>
+              </span>
             </div>
 
             <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
@@ -487,39 +528,29 @@ export default function AdminCouponsPage() {
         .btnPrimary { background: #1d4ed8; color: #fff; }
         .btnSoft { background: #e8efff; color: #1d4ed8; }
         .overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(10, 18, 40, 0.45);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 18px;
-            z-index: 50;
-
-            /* ✅ prevents scroll chaining to the page behind */
-            overscroll-behavior: contain;
-
-            /* ✅ touching overlay won't scroll the body */
-            touch-action: none;
-            }
-
-            .overlayCard {
-            width: min(640px, 95vw);
-            background: #fff;
-            border-radius: 22px;
-            padding: 18px;
-            border: 1px solid rgba(29,78,216,0.14);
-            box-shadow: 0 18px 50px rgba(10,42,122,0.18);
-
-            /* ✅ make card scrollable instead of the page */
-            max-height: calc(100vh - 40px);
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-
-            /* ✅ allow vertical scrolling inside card */
-            touch-action: pan-y;
-            }
-
+          position: fixed;
+          inset: 0;
+          background: rgba(10, 18, 40, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+          z-index: 50;
+          overscroll-behavior: contain;
+          touch-action: none;
+        }
+        .overlayCard {
+          width: min(640px, 95vw);
+          background: #fff;
+          border-radius: 22px;
+          padding: 18px;
+          border: 1px solid rgba(29,78,216,0.14);
+          box-shadow: 0 18px 50px rgba(10,42,122,0.18);
+          max-height: calc(100vh - 40px);
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          touch-action: pan-y;
+        }
         .xBtn {
           border: 0; background: transparent; color: rgba(10,42,122,0.55);
           font-weight: 950; font-size: 18px; cursor: pointer;
