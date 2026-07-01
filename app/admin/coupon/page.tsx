@@ -382,7 +382,11 @@ export default function AdminCouponsPage() {
                 {r.coupons?.name ?? "Coupon"} • {r.redeem_type === "daily" ? "Daily" : "Once"}
               </div>
               <div className="muted" style={{ fontWeight: 900 }}>
-                {new Date(r.redeemed_at).toLocaleString()}
+                {new Date(r.redeemed_at).toLocaleString("en-US", {
+                  timeZone: "America/Chicago",
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })}
               </div>
             </div>
 

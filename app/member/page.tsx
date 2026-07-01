@@ -508,105 +508,15 @@ export default function MemberPage() {
   }, [connected, connectedTablet]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
-      <style jsx global>{`
-        * { -webkit-tap-highlight-color: transparent; }
-        .wrap { max-width: 560px; margin: 0 auto; }
-        .card {
-          background: #fff; border-radius: 18px; padding: 18px;
-          border: 1px solid rgba(29,78,216,0.14);
-          box-shadow: 0 8px 24px rgba(10,42,122,0.06);
-        }
-        .title { font-size: 22px; font-weight: 950; color: #0a2a7a; }
-        .muted { color: rgba(10,42,122,0.65); font-weight: 800; }
-        .input {
-          width: 100%; padding: 14px; border-radius: 14px;
-          border: 1px solid #c7d2fe; margin-top: 8px; font-weight: 850;
-          outline: none;
-        }
-        .btnRow { display: flex; gap: 10px; margin-top: 12px; }
-        .btn {
-          padding: 14px; border-radius: 16px; border: 0;
-          font-weight: 950; cursor: pointer;
-        }
-        .btnPrimary { background: #1d4ed8; color: #fff; }
-        .btnSoft { background: #e8efff; color: #1d4ed8; }
-        .bigPoints { font-size: 46px; font-weight: 950; color: #0a2a7a; margin-top: 8px; }
-        .divider { height: 1px; background: rgba(29,78,216,0.12); margin: 14px 0; }
-        .qrBox { display: flex; justify-content: center; margin-top: 14px; }
-        .badge {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 8px 12px; border-radius: 999px;
-          background: rgba(29,78,216,0.10); color: #1d4ed8;
-          font-weight: 950;
-        }
-        .xBtn {
-          border: 0; background: transparent; color: rgba(10,42,122,0.55);
-          font-weight: 950; font-size: 18px; cursor: pointer;
-        }
-
-        /* Redeem bottom sheet */
-        .sheetWrap {
-          position: fixed; left: 0; right: 0; bottom: 0;
-          display: flex; justify-content: center;
-          padding: 12px 16px;
-          pointer-events: none;
-        }
-        .sheet {
-          width: min(560px, calc(100vw - 32px));
-          background: #ffffff;
-          border-radius: 22px;
-          border: 1px solid rgba(29,78,216,0.16);
-          box-shadow: 0 18px 50px rgba(10,42,122,0.18);
-          padding: 14px;
-          transform: translateY(110%);
-          transition: transform 220ms ease;
-          pointer-events: auto;
-        }
-        .sheetOpen { transform: translateY(0); }
-        .sheetTop {
-          display: flex; justify-content: space-between; align-items: center;
-          gap: 10px;
-        }
-        .sheetBtn {
-          width: 100%;
-          padding: 16px;
-          border-radius: 18px;
-          border: 0;
-          background: #1d4ed8;
-          color: #fff;
-          font-weight: 950;
-          font-size: 18px;
-          cursor: pointer;
-        }
-        .sheetBtn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        /* Popup overlay */
-        .overlay {
-          position: fixed; inset: 0;
-          background: rgba(10, 18, 40, 0.45);
-          display: flex; align-items: center; justify-content: center;
-          padding: 18px; z-index: 50;
-        }
-        .overlayCard {
-          width: min(560px, 95vw);
-          background: #fff; border-radius: 22px;
-          padding: 18px;
-          border: 1px solid rgba(29,78,216,0.14);
-          box-shadow: 0 18px 50px rgba(10,42,122,0.18);
-        }
-        .checkRow {
-          display: flex; gap: 10px; margin-top: 12px; align-items: flex-start;
-        }
-      `}</style>
-
+    <div className="pageFrame">
+      <div className="pageFrameInner">
       <div className="wrap">
         <TopNav />
 
         {!authUid ? (
-          <div className="card">
-            <div className="title">Sign in</div>
-            <div className="muted" style={{ marginTop: 6 }}>Use email + password.</div>
+          <div className="card fadeIn">
+            <div className="title">Welcome back</div>
+            <div className="muted" style={{ marginTop: 6 }}>Sign in to see your points and rewards.</div>
 
             <input
               className="input"
@@ -674,68 +584,92 @@ export default function MemberPage() {
             </div>
           </div>
         ) : (
-          <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-              <div>
-                <div className="title">Your Points</div>
-                <div className="muted" style={{ marginTop: 6 }}>
-                  <span className="badge">{connText}</span>
-                  {connected && lastSeenMsAgo != null ? (
-                    <span className="muted" style={{ marginLeft: 10, fontSize: 12 }}>
-                      (seen {Math.max(0, Math.floor(lastSeenMsAgo / 1000))}s ago)
-                    </span>
-                  ) : null}
+          <div className="stack fadeIn">
+            <div className="pointsHero">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                <div>
+                  <div className="pointsLabel">Your Points</div>
+                  <div className="bigPoints">{points}</div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettingsOpen(true);
+                    if (memberUuid) loadMemberSettingsById(memberUuid).catch(() => {});
+                  }}
+                  aria-label="Settings"
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 13,
+                    border: "1px solid rgba(255,255,255,0.3)",
+                    background: "rgba(255,255,255,0.15)",
+                    color: "#fff",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                    fontSize: 18,
+                  }}
+                >
+                  ⚙️
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setSettingsOpen(true);
-                  if (memberUuid) loadMemberSettingsById(memberUuid).catch(() => {});
-                }}
-                aria-label="Settings"
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 14,
-                  border: "1px solid rgba(29,78,216,0.18)",
-                  background: "#fff",
-                  color: "#1d4ed8",
-                  fontWeight: 950,
-                  cursor: "pointer",
-                  lineHeight: "42px",
-                  textAlign: "center",
-                  fontSize: 18,
-                }}
-              >
-                ⚙️
-              </button>
+              <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "7px 12px",
+                    borderRadius: 999,
+                    background: connected ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.12)",
+                    color: "#fff",
+                    fontWeight: 800,
+                    fontSize: 13,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 999,
+                      background: connected ? "#7dffa6" : "rgba(255,255,255,0.6)",
+                      display: "inline-block",
+                    }}
+                  />
+                  {connText}
+                </span>
+                {connected && lastSeenMsAgo != null ? (
+                  <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, fontWeight: 700 }}>
+                    seen {Math.max(0, Math.floor(lastSeenMsAgo / 1000))}s ago
+                  </span>
+                ) : null}
+              </div>
             </div>
 
-            <div className="bigPoints">{points}</div>
+            <div className="card">
+              {qrUrl ? (
+                <div className="qrBox">
+                  <img src={qrUrl} alt="Member QR" />
+                </div>
+              ) : (
+                <div className="qrBox">
+                  <div className="skeleton" style={{ width: 200, height: 200 }} />
+                </div>
+              )}
 
-            <div className="divider" />
-
-            {qrUrl ? (
-              <div className="qrBox">
-                <img src={qrUrl} alt="Member QR" style={{ borderRadius: 18 }} />
+              <div className="muted" style={{ marginTop: 14, textAlign: "center" }}>
+                Show this QR to the cashier to connect.
               </div>
-            ) : (
-              <div className="muted">Loading QR…</div>
-            )}
 
-            <div className="muted" style={{ marginTop: 14 }}>
-              Show this QR to the cashier to connect.
+              {redeemStatus ? (
+                <div className="statusMsg" style={{ textAlign: "center" }}>{redeemStatus}</div>
+              ) : null}
             </div>
-
-            {redeemStatus ? (
-              <div style={{ marginTop: 10, fontWeight: 850, color: "#0a2a7a" }}>
-                {redeemStatus}
-              </div>
-            ) : null}
           </div>
         )}
+      </div>
       </div>
 
       {/* Settings popup */}

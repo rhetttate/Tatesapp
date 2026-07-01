@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 
 type SaleItem = {
@@ -13,23 +13,14 @@ type SaleItem = {
   sort_order: number;
 };
 
-async function barcodeDataUrl(upc: string) {
-  const bwip = await import("bwip-js");
-  const png = bwip.toBuffer({
-    bcid: "upca",
-    text: upc,
-    scale: 2,
-    height: 9,         // shorter bars (not so long)
-    includetext: false // hide digits under bars
-  });
-  const b64 = Buffer.from(png).toString("base64");
-  return `data:image/png;base64,${b64}`;
+function digitsOnly(s: string) {
+  return (s || "").replace(/\D/g, "");
 }
 
 export default function CashierUpcsPage() {
   const [items, setItems] = useState<SaleItem[]>([]);
-  const [imgs, setImgs] = useState<Record<string, string>>({});
   const [status, setStatus] = useState("");
+  const canvasMapRef = useRef<Record<string, HTMLCanvasElement | null>>({});
 
   async function load() {
     setStatus("");
@@ -45,16 +36,7 @@ export default function CashierUpcsPage() {
     }
 
     const list = ((data as any) || []) as SaleItem[];
-    const show = list.slice(0, 8); // fits the screen perfect
-    setItems(show);
-
-    const next: Record<string, string> = {};
-    for (const it of show) {
-      try {
-        next[it.id] = await barcodeDataUrl(it.upc);
-      } catch {}
-    }
-    setImgs(next);
+    setItems(list.slice(0, 8)); // fits the screen perfectly
   }
 
   useEffect(() => {
@@ -62,6 +44,32 @@ export default function CashierUpcsPage() {
     const t = setInterval(load, 4000); // phone updates show up fast
     return () => clearInterval(t);
   }, []);
+
+  // Draw the UPC-A barcodes to <canvas> (Node's Buffer isn't available in the browser).
+  useEffect(() => {
+    if (!items.length) return;
+    let cancelled = false;
+    (async () => {
+      const mod: any = await import("bwip-js");
+      const bwipjs = mod?.default ?? mod;
+      if (cancelled) return;
+      for (const it of items) {
+        const upc = digitsOnly(it.upc).slice(0, 12);
+        const canvas = canvasMapRef.current[it.id];
+        if (!canvas || upc.length !== 12) continue;
+        try {
+          bwipjs.toCanvas(canvas, {
+            bcid: "upca",
+            text: upc,
+            scale: 2,
+            height: 9,
+            includetext: false,
+          });
+        } catch {}
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [items]);
 
   return (
     <div className="saleRoot">
@@ -97,7 +105,7 @@ export default function CashierUpcsPage() {
           display: flex;
           justify-content: center;
         }
-        .barcodeImg { width: 86%; max-width: 380px; } /* slightly narrower */
+        .barcodeImg { width: 86%; max-width: 380px; height: auto; }
         .saleStatus { font-weight: 900; color: #0a2a7a; padding: 10px; }
       `}</style>
 
@@ -111,11 +119,10 @@ export default function CashierUpcsPage() {
             <div className="salePrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
 
             <div className="barcodeBox">
-              {imgs[it.id] ? (
-                <img className="barcodeImg" src={imgs[it.id]} alt="UPC-A" />
-              ) : (
-                <div style={{ fontWeight: 900, padding: 10 }}>Loading…</div>
-              )}
+              <canvas
+                className="barcodeImg"
+                ref={(el) => { canvasMapRef.current[it.id] = el; }}
+              />
             </div>
           </div>
         ))}

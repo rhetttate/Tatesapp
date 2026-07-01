@@ -1,25 +1,17 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 
 export default function AdminSettingsPage() {
-  const [unlocked, setUnlocked] = useState(false);
-  const [pin, setPin] = useState("");
-  const [pinError, setPinError] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
 
   const [pointsPerDollar, setPointsPerDollar] = useState<number>(4);
   const [pointValueCents, setPointValueCents] = useState<number>(1);
-
-  // ✅ new
   const [doublePointsEnabled, setDoublePointsEnabled] = useState<boolean>(false);
-
-  const adminPin = useMemo(() => process.env.NEXT_PUBLIC_ADMIN_PIN || "1234", []);
 
   useEffect(() => {
     (async () => {
@@ -46,16 +38,6 @@ export default function AdminSettingsPage() {
       }
     })();
   }, []);
-
-  function tryUnlock() {
-    setPinError("");
-    if (pin.trim() === adminPin) {
-      setUnlocked(true);
-      setPin("");
-    } else {
-      setPinError("Wrong PIN.");
-    }
-  }
 
   async function save() {
     setStatus("");
@@ -123,26 +105,7 @@ export default function AdminSettingsPage() {
             <div className="muted">Loading...</div>
           ) : (
             <>
-              {!unlocked ? (
-                <div>
-                  <div style={{ fontWeight: 800, marginBottom: 8 }}>Enter Admin PIN</div>
-                  <input
-                    className="input"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    inputMode="numeric"
-                    placeholder="PIN"
-                  />
-                  <div style={{ height: 10 }} />
-                  <button className="btn btnPrimary" onClick={tryUnlock} style={{ width: "100%" }}>
-                    Unlock
-                  </button>
-                  {pinError && <p style={{ marginTop: 10 }}>{pinError}</p>}
-                  <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>
-                    Note: This is a client-side PIN for MVP. For production we will secure updates server-side.
-                  </p>
-                </div>
-              ) : (
+              {(
                 <div style={{ display: "grid", gap: 12 }}>
                   <label>
                     Points per $1 (example: 3 means 3 points per dollar)

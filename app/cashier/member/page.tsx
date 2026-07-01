@@ -1,13 +1,8 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
+import { useEffect, useState } from "react";
+import { supabase } from "../../../lib/supabase";
 
 export default function MemberPage() {
   const [memberId, setMemberId] = useState(""); // UUID
@@ -17,7 +12,7 @@ export default function MemberPage() {
   const [linkedTablet, setLinkedTablet] = useState<string>("");
   const [expiresAt, setExpiresAt] = useState<string>("");
 
-  // Your app probably already stores member id somewhere; we’ll use localStorage for now
+  // Remember the last member id on this device.
   useEffect(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("member_id") : "";
     if (saved) setMemberId(saved);
@@ -98,7 +93,7 @@ export default function MemberPage() {
             placeholder="Paste your member id"
           />
           <div className="muted" style={{ marginTop: 8 }}>
-            (For now) this is your UUID. Later we’ll swap to member_code.
+            Paste the member’s ID to look up their points and connection status.
           </div>
         </div>
 

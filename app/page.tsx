@@ -50,28 +50,16 @@ function SwipeRow({
   if (!deals.length) return null;
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 12,
-          padding: "0 2px",
-        }}
-      >
-        <div style={{ fontWeight: 950, color: "#0a2a7a", fontSize: 16 }}>
-          {title}
-        </div>
-        <div className="muted" style={{ fontSize: 12 }}>
-          Swipe →
-        </div>
+    <div className="fadeIn">
+      <div className="sectionHead">
+        <div className="sectionTitle">{title}</div>
+        <div className="sectionHint">Swipe →</div>
       </div>
 
       <div className="swipeBleed">
         <div ref={rowRef} className="swipeRow" aria-label={title}>
 
-          {/* 👈 NEW: center spacer */}
+          {/* center spacer */}
           <div className="swipeStartCap" />
 
           {deals.map((d) => (
@@ -150,35 +138,73 @@ export default function DealsHomePage() {
   }, [deals]);
 
   return (
-  <div className="pageFrame">
-    <div className="pageFrameInner" style={{ maxWidth: 980, margin: "0 auto", padding: "14px 0 26px" }}>
+    <div className="pageFrame">
+      <div className="pageFrameInner">
         <TopNav />
 
-        {status ? (
-          <div className="muted" style={{ fontSize: 13, textAlign: "center" }}>
-            {status}
+        <a href="/member" className="homeHero fadeIn" style={{ display: "block", textDecoration: "none" }}>
+          <div className="homeHeroEyebrow">Tate's Rewards</div>
+          <div className="homeHeroTitle">Fresh deals & points, every day</div>
+          <div className="homeHeroSub">
+            Browse today's savings, clip coupons, and earn points on every trip.
           </div>
-        ) : loading ? (
-          <div className="muted" style={{ fontSize: 13, textAlign: "center" }}>
-            Loading…
+          <span className="homeHeroCta">View my points →</span>
+        </a>
+
+        {status ? (
+          <div className="statusMsg statusErr" style={{ textAlign: "center" }}>
+            {status}
           </div>
         ) : null}
 
-        {featured.length > 0 ? <SwipeRow title="Top Deals" deals={featured} /> : null}
+        {loading && !status ? <DealsSkeleton /> : null}
 
-        {byDept.length > 0 ? (
+        {!loading && featured.length > 0 ? (
+          <SwipeRow title="Top Deals" deals={featured} />
+        ) : null}
+
+        {!loading && byDept.length > 0 ? (
           <>
             {byDept.map((sec) => (
               <SwipeRow key={sec.key} title={sec.title} deals={sec.deals} compact />
             ))}
           </>
-        ) : (
-          !loading && (
-            <div className="muted" style={{ marginTop: 14, textAlign: "center" }}>
-              No deals yet.
+        ) : null}
+
+        {!loading && !status && featured.length === 0 && byDept.length === 0 ? (
+          <div className="card fadeIn" style={{ marginTop: 22, textAlign: "center" }}>
+            <div className="title">No deals yet</div>
+            <div className="muted" style={{ marginTop: 8 }}>
+              Check back soon — fresh savings are on the way.
             </div>
-          )
-        )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DealsSkeleton() {
+  return (
+    <div className="fadeIn">
+      <div className="sectionHead">
+        <div className="skeleton" style={{ height: 18, width: 130 }} />
+      </div>
+      <div className="swipeBleed">
+        <div className="swipeRow">
+          <div className="swipeStartCap" />
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="dealCard">
+              <div className="skeleton" style={{ height: 188, borderRadius: 0 }} />
+              <div className="dealBody">
+                <div className="skeleton" style={{ height: 18, width: "70%" }} />
+                <div className="skeleton" style={{ height: 13, width: "90%" }} />
+                <div className="skeleton" style={{ height: 22, width: 80, marginTop: 4 }} />
+              </div>
+            </div>
+          ))}
+          <div className="swipeEndCap" />
+        </div>
       </div>
     </div>
   );

@@ -11,6 +11,13 @@ function digitsOnly(s: string) {
   return (s || "").replace(/\D/g, "");
 }
 
+function todayYmd() {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 function beep(freq = 880, ms = 120) {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -120,6 +127,11 @@ export default function CouponsPage() {
   const [rows, setRows] = useState<CouponRow[]>([]);
   const [status, setStatus] = useState("");
 
+  // member + usage (to grey out already-used coupons)
+  const [memberId, setMemberId] = useState<string | null>(null);
+  const [everUsed, setEverUsed] = useState<Set<string>>(new Set());
+  const [usedToday, setUsedToday] = useState<Set<string>>(new Set());
+
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemName, setRedeemName] = useState("");
   const [redeemUpc, setRedeemUpc] = useState("");
@@ -172,10 +184,61 @@ export default function CouponsPage() {
     }
   }
 
+  // Which coupons has THIS member already used?
+  // "once" coupons are used forever once redeemed; "daily" coupons are used for
+  // the current day only. We grey those out and sink them to the bottom.
+  async function loadUsage(mid: string) {
+    try {
+      const { data, error } = await supabase
+        .from("coupon_redemptions")
+        .select("coupon_id,redeem_date")
+        .eq("member_id", mid)
+        .limit(1000);
+
+      if (error) throw error;
+
+      const ever = new Set<string>();
+      const today = new Set<string>();
+      const ymd = todayYmd();
+
+      ((data as any[]) || []).forEach((r) => {
+        const cid = String(r.coupon_id);
+        ever.add(cid);
+        const rd = r.redeem_date ? String(r.redeem_date).slice(0, 10) : "";
+        if (rd === ymd) today.add(cid);
+      });
+
+      setEverUsed(ever);
+      setUsedToday(today);
+    } catch {
+      // If usage can't be read (e.g. RLS), just don't grey anything — fail open.
+      setEverUsed(new Set());
+      setUsedToday(new Set());
+    }
+  }
+
+  function isUsed(c: CouponRow) {
+    return c.redeem_type === "once" ? everUsed.has(c.id) : usedToday.has(c.id);
+  }
+
   useEffect(() => {
-    if (!authed) return;
+    if (!authed) {
+      setMemberId(null);
+      return;
+    }
     load();
-    // no refresh button — but you still get a load when you open the page
+    // Resolve this member's id, then load their coupon usage.
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc("ensure_member_for_auth_user");
+        if (error) throw error;
+        const mid = data as string;
+        setMemberId(mid);
+        if (mid) await loadUsage(mid);
+      } catch {
+        setMemberId(null);
+      }
+    })();
   }, [authed]);
 
   async function redeem(c: CouponRow) {
@@ -194,6 +257,11 @@ export default function CouponsPage() {
       setRedeemType((row?.redeem_type ?? c.redeem_type) as any);
       setRedeemOpen(true);
 
+      // Mark used immediately so it greys out, then re-sync from the server.
+      setEverUsed((s) => new Set(s).add(c.id));
+      if (c.redeem_type === "daily") setUsedToday((s) => new Set(s).add(c.id));
+      if (memberId) loadUsage(memberId);
+
       beep(1200, 120);
       vibrate(50);
     } catch (e: any) {
@@ -209,93 +277,125 @@ export default function CouponsPage() {
     return "";
   }, [rows.length, status]);
 
+  // Available coupons first (in their sort order), used coupons sunk to the bottom.
+  const displayRows = useMemo(() => {
+    const used = (c: CouponRow) =>
+      c.redeem_type === "once" ? everUsed.has(c.id) : usedToday.has(c.id);
+    return [...rows].sort((a, b) => {
+      const ua = used(a) ? 1 : 0;
+      const ub = used(b) ? 1 : 0;
+      if (ua !== ub) return ua - ub;
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    });
+  }, [rows, everUsed, usedToday]);
+
   if (booting) {
     return (
-      <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
-        <div className="wrap">
+      <div className="pageFrame">
+        <div className="pageFrameInner">
           <TopNav />
-          <div className="muted" style={{ marginTop: 10, textAlign: "center" }}>Loading…</div>
+          <div className="wrap stack">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="couponRow">
+                <div className="couponImg skeleton" />
+                <div style={{ minWidth: 0 }}>
+                  <div className="skeleton" style={{ height: 16, width: "60%" }} />
+                  <div className="skeleton" style={{ height: 12, width: "85%", marginTop: 8 }} />
+                </div>
+                <div className="skeleton" style={{ width: 96, height: 44, borderRadius: 16 }} />
+              </div>
+            ))}
+          </div>
         </div>
-        <Style />
       </div>
     );
   }
 
   if (!authed) {
     return (
-      <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
-        <div className="wrap">
+      <div className="pageFrame">
+        <div className="pageFrameInner">
           <TopNav />
-          <div className="card" style={{ marginTop: 12 }}>
-            <div className="title">Coupons</div>
-            <div className="muted" style={{ marginTop: 8 }}>
-              Please sign in to view and redeem coupons.
-            </div>
+          <div className="wrap">
+            <div className="card fadeIn">
+              <div className="title">Coupons</div>
+              <div className="muted" style={{ marginTop: 8 }}>
+                Please sign in to view and redeem your coupons.
+              </div>
 
-            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-              <Link href="/member" className="btn btnPrimary" style={{ flex: 1, textAlign: "center" }}>
-                Sign in
-              </Link>
-              <Link href="/" className="btn btnSoft" style={{ flex: 1, textAlign: "center" }}>
-                Back to Deals
-              </Link>
+              <div className="btnRow">
+                <Link href="/member" className="btn btnPrimary" style={{ flex: 1 }}>
+                  Sign in
+                </Link>
+                <Link href="/" className="btn btnSoft" style={{ flex: 1 }}>
+                  Back to Deals
+                </Link>
+              </div>
             </div>
           </div>
         </div>
-        <Style />
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
-      <Style />
-
-      <div className="wrap">
+    <div className="pageFrame">
+      <div className="pageFrameInner">
         <TopNav />
 
+        <div className="wrap">
         {status ? (
-          <div style={{ marginTop: 10, fontWeight: 850, color: "#0a2a7a", textAlign: "center" }}>
+          <div className="statusMsg statusErr" style={{ textAlign: "center" }}>
             {status}
           </div>
         ) : null}
 
         {emptyText && !status ? (
-          <div className="muted" style={{ marginTop: 14, textAlign: "center" }}>
-            {emptyText}
+          <div className="card fadeIn" style={{ textAlign: "center" }}>
+            <div className="muted">{emptyText}</div>
           </div>
         ) : null}
 
-        <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-          {rows.map((c) => (
-            <div key={c.id} className="couponRow">
-              <div className="couponImg">
-                {c.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={c.image_url}
-                    alt={c.name}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    draggable={false}
-                  />
+        <div className="stack fadeIn">
+          {displayRows.map((c) => {
+            const used = isUsed(c);
+            return (
+              <div key={c.id} className={"couponRow" + (used ? " couponUsed" : "")}>
+                <div className="couponImg">
+                  {c.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.image_url}
+                      alt={c.name}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      draggable={false}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", background: "rgba(29,78,216,0.08)" }} />
+                  )}
+                </div>
+
+                <div style={{ minWidth: 0 }}>
+                  <div className="couponName">{c.name}</div>
+                  <div className="couponDesc">{c.description}</div>
+                  <div className="couponMeta">
+                    {c.redeem_type === "daily" ? "Reusable daily" : "One-time use"}
+                  </div>
+                </div>
+
+                {used ? (
+                  <span className="couponUsedTag">
+                    {c.redeem_type === "daily" ? "Used today" : "Used"}
+                  </span>
                 ) : (
-                  <div style={{ width: "100%", height: "100%", background: "rgba(29,78,216,0.08)" }} />
+                  <button className="redeemBtn" onClick={() => redeem(c)}>
+                    Redeem
+                  </button>
                 )}
               </div>
-
-              <div style={{ minWidth: 0 }}>
-                <div className="couponName">{c.name}</div>
-                <div className="couponDesc">{c.description}</div>
-                <div className="couponMeta">
-                  {c.redeem_type === "daily" ? "Reusable daily" : "One-time use"}
-                </div>
-              </div>
-
-              <button className="redeemBtn" onClick={() => redeem(c)}>
-                Redeem
-              </button>
-            </div>
-          ))}
+            );
+          })}
+        </div>
         </div>
       </div>
 
@@ -309,12 +409,12 @@ export default function CouponsPage() {
 
             <div style={{ marginTop: 14 }}>
               <BarcodeCanvas upc={redeemUpc} />
-              <div className="muted" style={{ marginTop: 10, fontWeight: 900, textAlign: "center" }}>
+              <div className="muted" style={{ marginTop: 10, fontWeight: 800, textAlign: "center" }}>
                 Have the cashier scan this barcode.
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <div className="btnRow">
               <button className="btn btnPrimary" style={{ flex: 1 }} onClick={() => setRedeemOpen(false)}>
                 Done
               </button>
@@ -323,110 +423,5 @@ export default function CouponsPage() {
         </div>
       ) : null}
     </div>
-  );
-}
-
-function Style() {
-  return (
-    <style jsx global>{`
-      * { -webkit-tap-highlight-color: transparent; }
-      a { color: inherit; }
-      .wrap { max-width: 560px; margin: 0 auto; }
-
-      .card {
-        background: #fff;
-        border-radius: 22px;
-        padding: 18px;
-        border: 1px solid rgba(29,78,216,0.14);
-        box-shadow: 0 8px 24px rgba(10,42,122,0.06);
-      }
-
-      .title { font-size: 22px; font-weight: 950; color: #0a2a7a; }
-      .muted { color: rgba(10,42,122,0.65); font-weight: 800; }
-
-      .btn {
-        padding: 12px 14px;
-        border-radius: 16px;
-        border: 0;
-        font-weight: 950;
-        cursor: pointer;
-        text-decoration: none;
-        display: inline-block;
-      }
-      .btnPrimary { background: #1d4ed8; color: #fff; }
-      .btnSoft { background: #e8efff; color: #1d4ed8; }
-
-      .couponRow {
-        display: grid;
-        grid-template-columns: 78px 1fr 110px;
-        gap: 12px;
-        align-items: center;
-        background: #fff;
-        border-radius: 18px;
-        padding: 10px 10px;
-        border: 1px solid rgba(29,78,216,0.14);
-        box-shadow: 0 8px 24px rgba(10,42,122,0.05);
-      }
-
-      .couponImg {
-        width: 78px;
-        height: 58px;
-        border-radius: 14px;
-        overflow: hidden;
-        border: 1px solid rgba(29,78,216,0.14);
-        background: #fff;
-      }
-
-      .couponName {
-        font-weight: 950;
-        color: #0a2a7a;
-        font-size: 16px;
-        line-height: 1.1;
-      }
-
-      .couponDesc {
-        margin-top: 4px;
-        color: rgba(10,42,122,0.65);
-        font-weight: 800;
-        font-size: 12px;
-        line-height: 1.25;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-      }
-
-      .couponMeta {
-        margin-top: 6px;
-        font-size: 12px;
-        font-weight: 900;
-        color: rgba(10,42,122,0.55);
-      }
-
-      .redeemBtn {
-        width: 110px;
-        padding: 12px 10px;
-        border-radius: 16px;
-        border: 0;
-        background: #1d4ed8;
-        color: #fff;
-        font-weight: 950;
-        cursor: pointer;
-      }
-
-      .overlay {
-        position: fixed; inset: 0;
-        background: rgba(10, 18, 40, 0.45);
-        display: flex; align-items: center; justify-content: center;
-        padding: 18px; z-index: 50;
-      }
-      .overlayCard {
-        width: min(560px, 95vw);
-        background: #fff; border-radius: 22px;
-        padding: 18px;
-        border: 1px solid rgba(29,78,216,0.14);
-        box-shadow: 0 18px 50px rgba(10,42,122,0.18);
-      }
-    `}</style>
   );
 }

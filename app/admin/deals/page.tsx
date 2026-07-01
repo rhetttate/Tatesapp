@@ -451,7 +451,16 @@ export default function AdminDealsPage() {
                       onChange={(e) =>
                         setDeals((prev) => prev.map((x) => (x.id === d.id ? { ...x, price: Number(e.target.value) } : x)))
                       }
-                      onBlur={(e) => updateDeal(d.id, { price: Number(e.target.value) })}
+                      onBlur={(e) => {
+                        const t = e.target.value.trim();
+                        const n = t === "" ? 0 : Number(t);
+                        if (!Number.isFinite(n) || n < 0) {
+                          // invalid — revert to the saved value instead of writing NaN
+                          setDeals((prev) => prev.map((x) => (x.id === d.id ? { ...x, price: d.price } : x)));
+                          return;
+                        }
+                        updateDeal(d.id, { price: n });
+                      }}
                     />
                   </div>
 

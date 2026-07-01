@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { supabase } from "../../lib/supabase";
+import { sendToPos } from "../../lib/posBridge";
 
 /* ---------- helpers ---------- */
 function digitsOnly(s: string) {
@@ -160,6 +162,18 @@ export default function CashierPage() {
   const [redeemUpc, setRedeemUpc] = useState<string | null>(null);
   const [redeemCents, setRedeemCents] = useState<number>(0);
   const [redeemMsg, setRedeemMsg] = useState<string>("");
+
+  // tap-to-send toast (Sale tab)
+  const [toast, setToast] = useState<string>("");
+  const toastTimer = useRef<any>(null);
+  async function ringItem(name: string, upc: string) {
+    beep(980, 80);
+    vibrate(20);
+    const res = await sendToPos(upc);
+    setToast(res.delivered ? `Sent ${name} to register ✅` : `${name}: ${res.message}`);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), 2600);
+  }
 
   const saleMode = tab === TAB_SALE;
 
@@ -464,8 +478,8 @@ export default function CashierPage() {
 
         .topBar {
           display: flex; align-items: center; justify-content: space-between;
-          gap: 10px;
-          padding: 12px 14px;
+          gap: 10px; flex-wrap: wrap;
+          padding: 12px 16px;
           border-radius: 18px;
           background: #ffffff;
           border: 1px solid rgba(10, 60, 160, 0.10);
@@ -480,21 +494,32 @@ export default function CashierPage() {
         .dot { width: 10px; height: 10px; border-radius: 999px; background: #1d4ed8; }
 
         .pill {
-          padding: 7px 10px; border-radius: 999px;
+          padding: 7px 12px; border-radius: 999px;
           background: rgba(29,78,216,0.12);
-          color: #1d4ed8; font-weight: 950; font-size: 12px;
+          color: #1d4ed8; font-weight: 800; font-size: 12px;
           white-space: nowrap;
+          display: inline-flex; align-items: center; gap: 6px;
         }
+        .pillOn { background: rgba(22,163,74,0.14); color: #15803d; }
+        .pillOff { background: rgba(10,42,122,0.08); color: rgba(10,42,122,0.6); }
+        .pillDot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; display: inline-block; }
 
         .tabs { display: flex; gap: 10px; align-items: center; }
         .tabBtn {
-          padding: 12px 14px; border-radius: 16px;
+          padding: 12px 18px; border-radius: 14px;
           border: 1px solid rgba(10,60,160,0.14);
-          background: #fff; font-weight: 950; font-size: 16px;
+          background: #fff; font-weight: 800; font-size: 16px;
           cursor: pointer;
+          transition: transform .12s ease, box-shadow .18s ease, background .15s ease;
         }
-        .tabBtnActive { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+        .tabBtn:active { transform: translateY(1px); }
+        .tabBtnActive {
+          background: linear-gradient(180deg, #2563eb, #1d4ed8);
+          color: #fff; border-color: transparent;
+          box-shadow: 0 6px 16px rgba(29,78,216,0.3);
+        }
         .tabBtnDanger { background: #fff; border-color: rgba(220,38,38,0.25); color: #b91c1c; }
+        .tabBtnDanger:hover { background: #fef2f2; }
 
         /* main container that fills remaining height */
         .main {
@@ -569,12 +594,20 @@ export default function CashierPage() {
 
         .bigBtnRow { display: flex; gap: 12px; margin-top: 14px; }
         .bigBtn {
-          flex: 1; padding: 16px; border-radius: 18px;
+          flex: 1; padding: 18px; border-radius: 16px;
           border: 1px solid rgba(10,60,160,0.18);
-          background: #fff; font-weight: 950; font-size: 18px;
+          background: #fff; font-weight: 800; font-size: 18px;
           cursor: pointer;
+          transition: transform .12s ease, box-shadow .18s ease, background .15s ease;
         }
-        .bigBtnPrimary { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+        .bigBtn:active { transform: translateY(1px) scale(.995); }
+        .bigBtn:hover { background: #f7f9fe; }
+        .bigBtnPrimary {
+          background: linear-gradient(180deg, #2563eb, #1d4ed8);
+          color: #fff; border-color: transparent;
+          box-shadow: 0 8px 20px rgba(29,78,216,0.3);
+        }
+        .bigBtnPrimary:hover { background: linear-gradient(180deg, #2f6bf0, #1e51e0); }
 
         .statusBox {
           margin-top: 12px; padding: 12px 14px; border-radius: 16px;
@@ -586,16 +619,24 @@ export default function CashierPage() {
 
         .overlay {
           position: fixed; inset: 0;
-          background: rgba(10, 18, 40, 0.45);
+          background: rgba(10, 18, 40, 0.5);
+          backdrop-filter: blur(3px);
           display: flex; align-items: center; justify-content: center;
           padding: 18px; z-index: 50;
+          animation: kioskFade .2s ease both;
         }
+        @keyframes kioskFade { from { opacity: 0; } to { opacity: 1; } }
         .overlayCard {
           width: min(680px, 96vw);
-          background: #fff; border-radius: 22px;
-          padding: 14px;
+          background: #fff; border-radius: 24px;
+          padding: 18px;
           border: 1px solid rgba(10,60,160,0.14);
-          box-shadow: 0 18px 50px rgba(10,42,122,0.18);
+          box-shadow: 0 18px 50px rgba(10,42,122,0.22);
+          animation: kioskPop .26s cubic-bezier(.22,.61,.36,1) both;
+        }
+        @keyframes kioskPop {
+          from { opacity: 0; transform: translateY(14px) scale(.97); }
+          to { opacity: 1; transform: none; }
         }
 
         /* Sale grid default */
@@ -607,18 +648,29 @@ export default function CashierPage() {
         }
 
         .saleCard {
-          border-radius: 22px;
-          border: 1px solid rgba(10,60,160,0.14);
-          background: #f8fbff;
-          padding: 12px;
+          border-radius: 20px;
+          border: 1px solid rgba(10,60,160,0.12);
+          background: linear-gradient(180deg, #ffffff, #f6faff);
+          padding: 14px;
           display: grid;
           gap: 10px;
           align-content: start;
           min-height: 0;
+          box-shadow: 0 4px 14px rgba(10,42,122,0.05);
         }
 
-        .saleName { font-weight: 950; font-size: 18px; color: #0a2a7a; }
-        .salePrice { font-weight: 950; font-size: 22px; color: #1d4ed8; }
+        .saleName { font-weight: 900; font-size: 18px; color: #0a2a7a; letter-spacing: -0.01em; }
+        .salePrice { font-weight: 900; font-size: 22px; color: #1d4ed8; }
+        .saleCardTap { cursor: pointer; }
+        .saleCardTap:active { transform: scale(.98); }
+
+        .posToast {
+          position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+          background: #0a2a7a; color: #fff; font-weight: 800; font-size: 16px;
+          padding: 14px 20px; border-radius: 999px;
+          box-shadow: 0 14px 36px rgba(10,42,122,0.34); z-index: 60;
+          animation: kioskPop .22s ease both; max-width: 90vw;
+        }
         .saleUpc { font-weight: 900; color: rgba(10,42,122,0.60); font-size: 12px; }
 
         .keypad {
@@ -628,17 +680,23 @@ export default function CashierPage() {
           gap: 10px;
         }
         .key {
-          padding: 18px 0;
-          border-radius: 18px;
+          padding: 20px 0;
+          border-radius: 16px;
           border: 1px solid rgba(10,60,160,0.16);
           background: #fff;
-          font-weight: 950;
-          font-size: 22px;
+          font-weight: 800;
+          font-size: 24px;
           color: #0a2a7a;
           cursor: pointer;
+          transition: transform .1s ease, background .12s ease;
         }
+        .key:active { transform: scale(.96); background: #eef3ff; }
         .keyAlt { background: rgba(29,78,216,0.08); }
-        .keyDone { background: #1d4ed8; color: #fff; border-color: #1d4ed8; grid-column: 1 / -1; }
+        .keyDone {
+          background: linear-gradient(180deg, #2563eb, #1d4ed8);
+          color: #fff; border-color: transparent; grid-column: 1 / -1;
+          box-shadow: 0 8px 20px rgba(29,78,216,0.3);
+        }
 
         /* ============================
            SALE FULLSCREEN MODE
@@ -718,7 +776,10 @@ export default function CashierPage() {
             <span className="dot" />
             Cashier
             <span className="pill">{tabletId}</span>
-            <span className="pill">{memberId ? "CONNECTED" : "NOT CONNECTED"}</span>
+            <span className={"pill " + (memberId ? "pillOn" : "pillOff")}>
+              <span className="pillDot" />
+              {memberId ? "CONNECTED" : "NOT CONNECTED"}
+            </span>
           </div>
 
           <div className="tabs">
@@ -734,6 +795,9 @@ export default function CashierPage() {
             >
               Sale
             </button>
+            <Link href="/cashier/plu" className="tabBtn" style={{ textDecoration: "none" }}>
+              PLU Lookup
+            </Link>
             <button className="tabBtn tabBtnDanger" onClick={disconnect}>
               Disconnect
             </button>
@@ -803,7 +867,14 @@ export default function CashierPage() {
             ) : (
               <div className="saleGrid">
                 {sale.slice(0, 8).map((it) => (
-                  <div key={it.id} className="saleCard">
+                  <div
+                    key={it.id}
+                    className="saleCard saleCardTap"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => ringItem(it.name, it.upc)}
+                    title="Tap to send to register"
+                  >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
                       <div className="saleName">{it.name}</div>
                       <div className="salePrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
@@ -811,7 +882,7 @@ export default function CashierPage() {
 
                     <BarcodeCanvas upc={it.upc} tall />
 
-                    <div className="saleUpc">UPC: {digitsOnly(it.upc)}</div>
+                    <div className="saleUpc">Tap to ring • UPC {digitsOnly(it.upc)}</div>
                   </div>
                 ))}
               </div>
@@ -903,6 +974,9 @@ export default function CashierPage() {
             </div>
           </div>
         )}
+
+        {/* TAP-TO-SEND TOAST */}
+        {toast ? <div className="posToast">{toast}</div> : null}
       </div>
     </div>
   );

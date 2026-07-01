@@ -15,7 +15,7 @@ export default function TopNav() {
     <div className="topNavWrap">
       <div className="logoBar">
         <div className="logoBox">
-          <img className="logoImg" src="/tatessign.png" alt="Tate's Supermarket" />
+          <img className="logoImg" src="/Tatessign.png" alt="Tate's Supermarket" />
         </div>
       </div>
 

@@ -10,39 +10,52 @@ export default function ResetClient() {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   const searchParams = useSearchParams();
 
-  // Supabase recovery links often include tokens in the URL.
-  // This effect makes sure the session is established before showing the reset form.
+  // Supabase processes the recovery token from the URL asynchronously
+  // (detectSessionInUrl). A one-shot getSession() often runs BEFORE that
+  // finishes, so we also listen for the auth event and flip ready then.
   useEffect(() => {
     let alive = true;
+    searchParams?.toString(); // mark this as client-only logic
 
-    const init = async () => {
-      try {
-        // Touch searchParams so Next knows this is CSR-only logic
-        // (and it's now inside Suspense, so build won't fail)
-        searchParams?.toString();
-
-        const { data } = await supabase.auth.getSession();
-        if (!alive) return;
-        setReady(!!data.session);
-      } catch {
-        if (!alive) return;
-        setReady(false);
-      }
+    const finish = (ok: boolean) => {
+      if (!alive) return;
+      setReady(ok);
+      setChecking(false);
     };
 
-    init();
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (data.session) finish(true);
+      })
+      .catch(() => {});
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN" || session) {
+        finish(true);
+      }
+    });
+
+    // Give the URL-token exchange a moment before concluding it failed.
+    const t = setTimeout(() => {
+      if (alive && !ready) setChecking(false);
+    }, 2500);
+
     return () => {
       alive = false;
+      clearTimeout(t);
+      sub.subscription.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   async function updatePassword() {
     setStatus("");
     setBusy(true);
-
     try {
       if (!pw1 || pw1.length < 6) throw new Error("Password must be at least 6 characters.");
       if (pw1 !== pw2) throw new Error("Passwords do not match.");
@@ -50,10 +63,10 @@ export default function ResetClient() {
       const { error } = await supabase.auth.updateUser({ password: pw1 });
       if (error) throw error;
 
-      setStatus("Password updated ✅ You can go back and sign in.");
+      setStatus("Password updated ✅ Taking you to sign in…");
       setTimeout(() => {
         window.location.href = "/member";
-      }, 700);
+      }, 800);
     } catch (e: any) {
       setStatus("Error: " + (e?.message ?? String(e)));
     } finally {
@@ -62,82 +75,41 @@ export default function ResetClient() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
-      <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 22,
-            padding: 18,
-            border: "1px solid rgba(29,78,216,0.14)",
-            boxShadow: "0 8px 24px rgba(10,42,122,0.06)",
-          }}
-        >
-          <div style={{ fontSize: 22, fontWeight: 950, color: "#0a2a7a" }}>Reset Password</div>
-          <div style={{ color: "rgba(10,42,122,0.65)", fontWeight: 800, marginTop: 6 }}>
-            Enter a new password.
-          </div>
+    <div className="pageFrame">
+      <div className="pageFrameInner" style={{ maxWidth: 560 }}>
+        <div className="card fadeIn">
+          <div className="title">Reset Password</div>
+          <div className="muted" style={{ marginTop: 6 }}>Enter a new password.</div>
 
-          {!ready ? (
-            <div style={{ marginTop: 12, fontWeight: 850, color: "#0a2a7a" }}>
-              Open the reset link from your email on this device/browser.
+          {checking ? (
+            <div className="muted" style={{ marginTop: 14 }}>Verifying your reset link…</div>
+          ) : !ready ? (
+            <div className="statusMsg statusErr">
+              This reset link isn’t active. Open the link from your email on this device, or request a new one.
             </div>
           ) : (
             <>
               <input
-                style={{
-                  width: "100%",
-                  padding: 14,
-                  borderRadius: 14,
-                  border: "1px solid #c7d2fe",
-                  marginTop: 12,
-                  fontWeight: 850,
-                  outline: "none",
-                }}
+                className="input"
                 type="password"
                 placeholder="New password"
                 value={pw1}
                 onChange={(e) => setPw1(e.target.value)}
               />
-
               <input
-                style={{
-                  width: "100%",
-                  padding: 14,
-                  borderRadius: 14,
-                  border: "1px solid #c7d2fe",
-                  marginTop: 10,
-                  fontWeight: 850,
-                  outline: "none",
-                }}
+                className="input"
                 type="password"
                 placeholder="Confirm password"
                 value={pw2}
                 onChange={(e) => setPw2(e.target.value)}
               />
-
-              <button
-                onClick={updatePassword}
-                disabled={busy}
-                style={{
-                  marginTop: 12,
-                  width: "100%",
-                  padding: 14,
-                  borderRadius: 16,
-                  border: 0,
-                  background: "#1d4ed8",
-                  color: "#fff",
-                  fontWeight: 950,
-                  cursor: "pointer",
-                  opacity: busy ? 0.7 : 1,
-                }}
-              >
+              <button className="btn btnPrimary" onClick={updatePassword} disabled={busy} style={{ width: "100%", marginTop: 12 }}>
                 {busy ? "Saving…" : "Update password"}
               </button>
             </>
           )}
 
-          {status ? <div style={{ marginTop: 12, fontWeight: 850, color: "#0a2a7a" }}>{status}</div> : null}
+          {status ? <div className="statusMsg">{status}</div> : null}
         </div>
       </div>
     </div>

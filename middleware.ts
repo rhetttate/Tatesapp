@@ -12,38 +12,32 @@ function getHost(req: NextRequest) {
   return raw.split(",")[0].trim().toLowerCase();
 }
 
-function withDebug(res: NextResponse, host: string, pathname: string) {
-  res.headers.set("x-debug-host", host);
-  res.headers.set("x-debug-path", pathname);
-  return res;
-}
-
-function rewriteTo(prefix: string, req: NextRequest, host: string) {
+function rewriteTo(prefix: string, req: NextRequest) {
   const url = req.nextUrl.clone();
 
   if (url.pathname === "/") {
     url.pathname = prefix;
-    return withDebug(NextResponse.rewrite(url), host, url.pathname);
+    return NextResponse.rewrite(url);
   }
 
   if (url.pathname === prefix || url.pathname.startsWith(prefix + "/")) {
-    return withDebug(NextResponse.next(), host, url.pathname);
+    return NextResponse.next();
   }
 
   url.pathname = prefix + url.pathname;
-  return withDebug(NextResponse.rewrite(url), host, url.pathname);
+  return NextResponse.rewrite(url);
 }
 
 export function middleware(req: NextRequest) {
   const host = getHost(req);
 
   // IMPORTANT: match exact subdomains (not startsWith)
-  if (host === "admin.tatessupermarket.com") return rewriteTo("/admin", req, host);
-  if (host === "cashier.tatessupermarket.com") return rewriteTo("/cashier", req, host);
-  if (host === "app.tatessupermarket.com") return rewriteTo("/member", req, host);
+  if (host === "admin.tatessupermarket.com") return rewriteTo("/admin", req);
+  if (host === "cashier.tatessupermarket.com") return rewriteTo("/cashier", req);
+  if (host === "app.tatessupermarket.com") return rewriteTo("/member", req);
 
   // if someone uses other domains, do nothing
-  return withDebug(NextResponse.next(), host, req.nextUrl.pathname);
+  return NextResponse.next();
 }
 
 export const config = {

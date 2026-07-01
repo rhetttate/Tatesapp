@@ -213,10 +213,6 @@ export default function AdminSalesPage() {
 
   return (
     <div className="card" style={{ padding: 16, borderRadius: 18 }}>
-      {/* NOTE: install dependency:
-          npm i react-barcode
-      */}
-
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
         <div>
           <div style={{ fontWeight: 950, fontSize: 22 }}>Sales Items</div>

@@ -64,47 +64,10 @@ export default function ContactClient() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f3f7ff", padding: 18 }}>
-      <style jsx global>{`
-        @media (max-width: 480px) {
-          .wrap { padding: 8px 6px 22px; }
-        }
-
-        * { -webkit-tap-highlight-color: transparent; }
-        .wrap {
-          max-width: 1100px;
-          margin: 0 auto;
-          padding: 10px 10px 24px;
-        }
-
-        .card {
-          background: #fff; border-radius: 22px; padding: 18px;
-          border: 1px solid rgba(29,78,216,0.14);
-          box-shadow: 0 8px 24px rgba(10,42,122,0.06);
-        }
-        .title { font-size: 22px; font-weight: 950; color: #0a2a7a; }
-        .muted { color: rgba(10,42,122,0.65); font-weight: 800; }
-        .input {
-          width: 100%; padding: 14px; border-radius: 14px;
-          border: 1px solid #c7d2fe; margin-top: 8px; font-weight: 850;
-          outline: none;
-        }
-        .btnRow { display: flex; gap: 10px; margin-top: 12px; }
-        .btn {
-          padding: 14px; border-radius: 16px; border: 0;
-          font-weight: 950; cursor: pointer;
-        }
-        .btnPrimary { background: #1d4ed8; color: #fff; }
-        .btnPrimary:disabled { opacity: 0.65; cursor: not-allowed; }
-        .legalRow {
-          display: flex; gap: 10px; margin-top: 14px; justify-content: space-between;
-          font-weight: 850;
-        }
-        a { color: #1d4ed8; text-decoration: none; font-weight: 950; }
-      `}</style>
-
-      <div className="wrap">
-        <div className="card">
+    <div className="pageFrame">
+      <div className="pageFrameInner">
+        <div className="wrap">
+          <div className="card fadeIn">
           <div className="title">Contact Us</div>
           <div className="muted" style={{ marginTop: 6 }}>
             Enter your name and either email or phone. We’ll respond from <b>support@tatessupermarket.com</b>.
@@ -164,11 +127,12 @@ export default function ContactClient() {
             </button>
           </div>
 
-          {status ? <div style={{ marginTop: 12, fontWeight: 850, color: "#0a2a7a" }}>{status}</div> : null}
+          {status ? <div className="statusMsg">{status}</div> : null}
 
-          <div className="legalRow">
-            <Link href="/privacy">Privacy Policy</Link>
-            <Link href="/member">Back to Points</Link>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+            <Link href="/privacy" style={{ color: "var(--blue2)", fontWeight: 800 }}>Privacy Policy</Link>
+            <Link href="/member" style={{ color: "var(--blue2)", fontWeight: 800 }}>Back to Points</Link>
+          </div>
           </div>
         </div>
       </div>
