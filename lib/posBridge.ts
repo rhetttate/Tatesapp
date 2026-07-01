@@ -121,8 +121,14 @@ function onlyDigits(s: string) {
  * UI can fall back to an on-screen barcode when delivery isn't possible.
  */
 export async function sendToPos(rawCode: string): Promise<PosSendResult> {
-  const code = onlyDigits(rawCode);
+  let code = onlyDigits(rawCode);
   if (!code) return { ok: false, delivered: false, message: "No code to send." };
+
+  // A UPC-A is 11 data digits + 1 check digit. When a code is TYPED into the
+  // register (which is what the bridge does), NCR expects the 11-digit base and
+  // computes the check digit itself — so drop the trailing check digit. PLUs and
+  // other shorter codes are sent as-is.
+  if (code.length === 12) code = code.slice(0, 11);
 
   if (!isBridgeConnected()) {
     return {

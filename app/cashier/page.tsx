@@ -1,9 +1,15 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { sendToPos } from "../../lib/posBridge";
+import {
+  sendToPos,
+  connectBluetooth,
+  disconnectBluetooth,
+  getBridgeStatus,
+  isBluetoothSupported,
+  onBridgeChange,
+} from "../../lib/posBridge";
 
 /* ---------- helpers ---------- */
 function digitsOnly(s: string) {
@@ -118,7 +124,8 @@ export default function CashierPage() {
   /* ✅ tab typing that NEVER breaks */
   const TAB_MEMBER = 0 as const;
   const TAB_SALE = 1 as const;
-  type Tab = typeof TAB_MEMBER | typeof TAB_SALE;
+  const TAB_PLU = 2 as const;
+  type Tab = 0 | 1 | 2;
 
   const [tab, setTab] = useState<Tab>(TAB_MEMBER);
 
@@ -163,17 +170,85 @@ export default function CashierPage() {
   const [redeemCents, setRedeemCents] = useState<number>(0);
   const [redeemMsg, setRedeemMsg] = useState<string>("");
 
-  // tap-to-send toast (Sale tab)
+  // tap-to-send toast (Sale + PLU tabs)
   const [toast, setToast] = useState<string>("");
   const toastTimer = useRef<any>(null);
-  async function ringItem(name: string, upc: string) {
-    beep(980, 80);
-    vibrate(20);
-    const res = await sendToPos(upc);
-    setToast(res.delivered ? `Sent ${name} to register ✅` : `${name}: ${res.message}`);
+  function showToast(msg: string) {
+    setToast(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 2600);
   }
+  async function ringItem(name: string, code: string) {
+    beep(980, 80);
+    vibrate(20);
+    const res = await sendToPos(code);
+    showToast(res.delivered ? `Sent ${name} to register ✅` : `${name}: ${res.message}`);
+  }
+
+  // PLU lookup
+  type Plu = { id: string; plu: string; name: string; price: number | null; department: string | null };
+  const [plus, setPlus] = useState<Plu[]>([]);
+  const [pluLoading, setPluLoading] = useState(true);
+  const [pluQuery, setPluQuery] = useState("");
+  const pluSearchRef = useRef<HTMLInputElement | null>(null);
+
+  async function loadPlus() {
+    setPluLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("plus")
+        .select("id,plu,name,price,department,active,sort_order")
+        .eq("active", true)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true });
+      if (!error) setPlus((data as any) || []);
+    } finally {
+      setPluLoading(false);
+    }
+  }
+  useEffect(() => {
+    loadPlus();
+  }, []);
+
+  const pluFiltered = useMemo(() => {
+    const q = pluQuery.trim().toLowerCase();
+    if (!q) return plus;
+    return plus
+      .map((it) => {
+        const name = it.name.toLowerCase();
+        const code = it.plu.toLowerCase();
+        let s = -1;
+        if (code.startsWith(q)) s = 0;
+        else if (name.startsWith(q)) s = 1;
+        else if (code.includes(q)) s = 2;
+        else if (name.includes(q)) s = 3;
+        return { it, s };
+      })
+      .filter((x) => x.s >= 0)
+      .sort((a, b) => a.s - b.s || a.it.name.localeCompare(b.it.name))
+      .map((x) => x.it);
+  }, [plus, pluQuery]);
+
+  // POS bridge (Bluetooth) status
+  const [bridgeStatus, setBridgeStatus] = useState<"connected" | "disconnected">("disconnected");
+  const [btSupported, setBtSupported] = useState(true);
+  useEffect(() => {
+    setBridgeStatus(getBridgeStatus());
+    setBtSupported(isBluetoothSupported());
+    const off = onBridgeChange(setBridgeStatus);
+    return off;
+  }, []);
+  async function connectRegister() {
+    const res = await connectBluetooth();
+    showToast(res.message);
+  }
+
+  // Focus the PLU search when that tab opens
+  useEffect(() => {
+    if (tab !== TAB_PLU) return;
+    const t = setTimeout(() => pluSearchRef.current?.focus(), 150);
+    return () => clearTimeout(t);
+  }, [tab]);
 
   const saleMode = tab === TAB_SALE;
 
@@ -235,8 +310,8 @@ export default function CashierPage() {
     const dy = ey - sy;
 
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-      if (dx < 0) setTab(TAB_SALE);
-      if (dx > 0) setTab(TAB_MEMBER);
+      // swipe left -> next tab, swipe right -> previous tab (Member ↔ Sale ↔ PLU)
+      setTab((t) => (dx < 0 ? Math.min(TAB_PLU, t + 1) : Math.max(TAB_MEMBER, t - 1)) as Tab);
     }
   }
 
@@ -671,6 +746,34 @@ export default function CashierPage() {
           box-shadow: 0 14px 36px rgba(10,42,122,0.34); z-index: 60;
           animation: kioskPop .22s ease both; max-width: 90vw;
         }
+
+        /* PLU lookup tab */
+        .pluBar2 {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
+        }
+        .pluSearchInput {
+          width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 900;
+          border-radius: 16px; border: 1px solid rgba(10,60,160,0.18);
+          outline: none; background: #fff; color: #0a2a7a; margin-bottom: 14px;
+        }
+        .pluSearchInput:focus { border-color: #1d4ed8; box-shadow: 0 0 0 4px rgba(37,99,235,0.15); }
+        .pluGrid2 {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+          gap: 12px;
+        }
+        .pluTile2 {
+          text-align: left; cursor: pointer;
+          background: linear-gradient(180deg, #ffffff, #f6faff);
+          border: 1px solid rgba(10,60,160,0.14); border-radius: 18px; padding: 16px;
+          display: flex; flex-direction: column; gap: 6px; min-height: 96px;
+          transition: transform .1s ease;
+        }
+        .pluTile2:active { transform: scale(.97); }
+        .pluName2 { font-weight: 950; font-size: 19px; color: #0a2a7a; line-height: 1.1; }
+        .pluMeta2 { font-weight: 900; color: #1d4ed8; font-size: 14px; }
+        .pluPrice2 { margin-top: auto; font-weight: 950; font-size: 20px; color: #0a2a7a; }
         .saleUpc { font-weight: 900; color: rgba(10,42,122,0.60); font-size: 12px; }
 
         .keypad {
@@ -780,6 +883,10 @@ export default function CashierPage() {
               <span className="pillDot" />
               {memberId ? "CONNECTED" : "NOT CONNECTED"}
             </span>
+            <span className={"pill " + (bridgeStatus === "connected" ? "pillOn" : "pillOff")}>
+              <span className="pillDot" />
+              {bridgeStatus === "connected" ? "POS LINKED" : "POS OFF"}
+            </span>
           </div>
 
           <div className="tabs">
@@ -795,9 +902,12 @@ export default function CashierPage() {
             >
               Sale
             </button>
-            <Link href="/cashier/plu" className="tabBtn" style={{ textDecoration: "none" }}>
-              PLU Lookup
-            </Link>
+            <button
+              className={"tabBtn " + (tab === TAB_PLU ? "tabBtnActive" : "")}
+              onClick={() => setTab(TAB_PLU)}
+            >
+              PLU
+            </button>
             <button className="tabBtn tabBtnDanger" onClick={disconnect}>
               Disconnect
             </button>
@@ -883,6 +993,68 @@ export default function CashierPage() {
                     <BarcodeCanvas upc={it.upc} tall />
 
                     <div className="saleUpc">Tap to ring • UPC {digitsOnly(it.upc)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* PLU LOOKUP TAB */}
+          <div className={"pane " + (tab === TAB_PLU ? "paneActive" : "")}>
+            <div className="pluBar2">
+              <div className="title">PLU Lookup</div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                {bridgeStatus === "connected" ? (
+                  <button className="bigBtn" onClick={() => disconnectBluetooth()} style={{ flex: "0 0 auto" }}>
+                    Unlink register
+                  </button>
+                ) : (
+                  <button
+                    className="bigBtn bigBtnPrimary"
+                    onClick={connectRegister}
+                    disabled={!btSupported}
+                    style={{ flex: "0 0 auto" }}
+                  >
+                    Connect register
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <input
+              ref={pluSearchRef}
+              className="pluSearchInput"
+              placeholder="🔍  Search item or PLU…"
+              value={pluQuery}
+              onChange={(e) => setPluQuery(e.target.value)}
+              inputMode="search"
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
+
+            {pluLoading ? (
+              <div className="statusBox">Loading PLUs…</div>
+            ) : pluFiltered.length === 0 ? (
+              <div className="statusBox">
+                {pluQuery ? `No match for “${pluQuery}”.` : "No PLUs yet — add them in Admin → PLUs."}
+              </div>
+            ) : (
+              <div className="pluGrid2">
+                {pluFiltered.map((it) => (
+                  <div
+                    key={it.id}
+                    className="pluTile2"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => ringItem(it.name, it.plu)}
+                    title="Tap to send to register"
+                  >
+                    <div className="pluName2">{it.name}</div>
+                    <div className="pluMeta2">
+                      PLU {it.plu}
+                      {it.department ? ` • ${it.department}` : ""}
+                    </div>
+                    <div className="pluPrice2">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
                   </div>
                 ))}
               </div>
