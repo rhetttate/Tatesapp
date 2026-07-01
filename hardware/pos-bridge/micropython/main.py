@@ -36,14 +36,16 @@ _TERMINATOR = KeyCode.ENTER
 
 
 def type_code(code):
+    # Runs in the MAIN loop (never inside the BLE IRQ) so USB reports flush
+    # cleanly — otherwise a key gets stuck down and the OS auto-repeats it.
     try:
         for ch in code:
             kc = _DIGITS.get(ch)
             if kc is None:
                 continue
-            _kbd.send_keys([kc]); time.sleep_ms(8)
-            _kbd.send_keys([]);   time.sleep_ms(8)
-        _kbd.send_keys([_TERMINATOR]); time.sleep_ms(8)
+            _kbd.send_keys([kc]); time.sleep_ms(12)
+            _kbd.send_keys([]);   time.sleep_ms(12)
+        _kbd.send_keys([_TERMINATOR]); time.sleep_ms(12)
         _kbd.send_keys([])
     except Exception as e:
         print("type_code error:", e)
@@ -52,8 +54,7 @@ def type_code(code):
 # --- BLE advertising payload (name only; fits the 31-byte budget) -------------
 def _adv_payload(name):
     payload = bytearray()
-    # Flags: general discoverable, BR/EDR not supported
-    payload += struct.pack("BB", 2, 0x01) + struct.pack("B", 0x06)
+    payload += struct.pack("BB", 2, 0x01) + struct.pack("B", 0x06)  # flags
     nb = name.encode()
     payload += struct.pack("BB", len(nb) + 1, 0x09) + nb  # complete local name
     return payload
@@ -71,6 +72,9 @@ _UART_RX = (
     bluetooth.FLAG_WRITE | bluetooth.FLAG_WRITE_NO_RESPONSE,
 )
 _UART_SERVICE = (_UART_UUID, (_UART_TX, _UART_RX))
+
+# Codes received over BLE are queued here and typed by the main loop.
+_pending = []
 
 
 class PosBridge:
@@ -90,15 +94,14 @@ class PosBridge:
         self._ble.gap_advertise(100_000, adv_data=self._payload)
 
     def _irq(self, event, data):
+        # Keep this SHORT — no typing/sleeps here. Just buffer + queue.
         if event == _IRQ_CENTRAL_CONNECT:
             conn, _, _ = data
             self._conns.add(conn)
-            print("tablet connected")
         elif event == _IRQ_CENTRAL_DISCONNECT:
             conn, _, _ = data
             self._conns.discard(conn)
             self._buf = b""
-            print("tablet disconnected")
             self._advertise()
         elif event == _IRQ_GATTS_WRITE:
             conn, handle = data
@@ -108,11 +111,17 @@ class PosBridge:
                     line, self._buf = self._buf.split(b"\n", 1)
                     line = line.strip()
                     if line:
-                        print("ring:", line)
-                        type_code(line.decode())
+                        _pending.append(line)
 
 
 bridge = PosBridge()
 
 while True:
-    time.sleep_ms(200)
+    if _pending:
+        code = _pending.pop(0)
+        try:
+            print("ring:", code)
+            type_code(code.decode())
+        except Exception as e:
+            print("loop error:", e)
+    time.sleep_ms(20)
