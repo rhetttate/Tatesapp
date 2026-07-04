@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../../lib/supabase";
+import { useWedgeScanner, CameraScanOverlay } from "../../components/scanner";
 
 type Plu = {
   id: string;
@@ -26,6 +27,20 @@ function priceOrNull(raw: string) {
   return n;
 }
 
+/**
+ * Produce stickers are often EAN-13 ("02" + PLU + price + check) or plain
+ * short codes. Pull the PLU out of whatever the scanner gives us.
+ */
+function extractPlu(raw: string) {
+  const d = digitsOnly(raw);
+  if (d.length >= 3 && d.length <= 6) return d;
+  // GS1 DataBar / EAN-13 produce codes: PLU is in positions 3–7
+  if (d.length === 13 && (d.startsWith("02") || d.startsWith("2"))) {
+    return String(Number(d.slice(2, 7)));
+  }
+  return d;
+}
+
 export default function AdminPlusPage() {
   const [items, setItems] = useState<Plu[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +52,10 @@ export default function AdminPlusPage() {
   const [plu, setPlu] = useState("");
   const [price, setPrice] = useState("");
   const [department, setDepartment] = useState("");
+  const nameRef = useRef<HTMLInputElement | null>(null);
+
+  // camera scanner
+  const [camOpen, setCamOpen] = useState(false);
 
   // edit modal
   const [editing, setEditing] = useState<Plu | null>(null);
@@ -82,6 +101,26 @@ export default function AdminPlusPage() {
       return (a.name || "").localeCompare(b.name || "");
     });
   }, [items, query]);
+
+  /* ---------- scanning (USB wedge + camera) ---------- */
+  function handleScan(raw: string) {
+    const code = extractPlu(raw);
+    if (!code) return;
+    setCamOpen(false);
+
+    const match = items.find((it) => it.plu === code);
+    if (match) {
+      openEdit(match);
+      setStatus(`Scanned: found "${match.name}" (PLU ${match.plu}).`);
+      return;
+    }
+
+    setPlu(code);
+    setStatus(`Scanned ${code} — new PLU, enter a name.`);
+    nameRef.current?.focus();
+  }
+
+  useWedgeScanner(handleScan, { enabled: !editing && !camOpen, minLength: 3 });
 
   async function add() {
     setStatus("");
@@ -171,39 +210,45 @@ export default function AdminPlusPage() {
   }
 
   return (
-    <div className="card" style={{ padding: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+    <div className="card">
+      <div className="pageHead">
         <div>
           <div className="title">PLU Codes</div>
           <div className="muted" style={{ marginTop: 6 }}>
             Produce / lookup codes. Cashiers search these on the tablet and tap to ring up.
           </div>
         </div>
-        <button className="btn" onClick={load}>Refresh</button>
+        <div className="pageHeadActions">
+          <button className="btn btnSoft" onClick={() => setCamOpen(true)}>📷 Scan</button>
+          <button className="btn" onClick={load}>Refresh</button>
+        </div>
       </div>
 
       <div className="divider" />
 
       {/* add form */}
-      <div className="grid" style={{ gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
-        <div style={{ gridColumn: "span 6" }}>
-          <div className="muted" style={{ fontSize: 13, marginBottom: 2 }}>Item name</div>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Bananas" />
+      <div className="formGrid">
+        <div className="span6">
+          <label className="fieldLabel">Item name</label>
+          <input ref={nameRef} className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Bananas" />
         </div>
-        <div style={{ gridColumn: "span 6" }}>
-          <div className="muted" style={{ fontSize: 13, marginBottom: 2 }}>PLU code (3–6 digits)</div>
+        <div className="span6">
+          <label className="fieldLabel">PLU code (3–6 digits)</label>
           <input className="input" value={plu} onChange={(e) => setPlu(e.target.value)} inputMode="numeric" placeholder="4011" />
+          <div className="fieldHelp">Scan a produce sticker with a USB scanner to fill this in.</div>
         </div>
-        <div style={{ gridColumn: "span 6" }}>
-          <div className="muted" style={{ fontSize: 13, marginBottom: 2 }}>Price (optional)</div>
+        <div className="span6">
+          <label className="fieldLabel">Price (optional)</label>
           <input className="input" value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" placeholder="0.59" />
         </div>
-        <div style={{ gridColumn: "span 6" }}>
-          <div className="muted" style={{ fontSize: 13, marginBottom: 2 }}>Department (optional)</div>
+        <div className="span6">
+          <label className="fieldLabel">Department (optional)</label>
           <input className="input" value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Produce" />
         </div>
-        <div style={{ gridColumn: "span 12" }}>
-          <button className="btn btnPrimary" onClick={add} style={{ width: "100%" }}>Add PLU</button>
+        <div className="span12">
+          <button className="btn btnPrimary" onClick={add} style={{ width: "100%", padding: "14px 16px", fontSize: 16 }}>
+            Add PLU
+          </button>
         </div>
       </div>
 
@@ -211,37 +256,41 @@ export default function AdminPlusPage() {
 
       <div className="divider" />
 
-      <div style={{ marginBottom: 12 }}>
-        <input
-          className="input"
-          placeholder="Search PLUs by name or code…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{ marginTop: 0 }}
-        />
-      </div>
+      <input
+        className="input"
+        placeholder="🔍 Search PLUs by name or code…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        style={{ marginTop: 0, marginBottom: 14 }}
+      />
 
       {loading ? (
-        <div className="muted">Loading…</div>
+        <div className="stack">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton" style={{ height: 108 }} />
+          ))}
+        </div>
       ) : (
         <div className="grid">
           {filtered.map((it) => (
-            <div key={it.id} className="card" style={{ padding: 14, borderRadius: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-                <div style={{ fontWeight: 900, fontSize: 18, color: "var(--ink)" }}>{it.name}</div>
-                <div style={{ fontWeight: 900, fontSize: 18, color: "var(--blue2)" }}>
-                  {it.price != null ? "$" + Number(it.price).toFixed(2) : ""}
-                </div>
+            <div key={it.id} className="listRow">
+              <div className="listRowTop">
+                <div className="listRowName">{it.name}</div>
+                <div className="listRowPrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
               </div>
-              <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-                PLU {it.plu}{it.department ? ` • ${it.department}` : ""}
+              <div className="listRowMeta">
+                <span className={"chip " + (it.active ? "chipOk" : "chipOff")}>
+                  {it.active ? "Active" : "Inactive"}
+                </span>{" "}
+                <span className="mono">PLU {it.plu}</span>
+                {it.department ? ` • ${it.department}` : ""}
               </div>
-              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                <button className={"btn " + (it.active ? "btnPrimary" : "")} onClick={() => toggle(it)} style={{ flex: 1 }}>
+              <div className="listRowActions">
+                <button className={"btn " + (it.active ? "btnPrimary" : "")} onClick={() => toggle(it)}>
                   {it.active ? "Active" : "Inactive"}
                 </button>
-                <button className="btn" onClick={() => openEdit(it)} style={{ flex: 1 }}>Edit</button>
-                <button className="btn" onClick={() => remove(it)} style={{ flex: 1 }}>Delete</button>
+                <button className="btn" onClick={() => openEdit(it)}>Edit</button>
+                <button className="btn btnDanger" onClick={() => remove(it)}>Delete</button>
               </div>
             </div>
           ))}
@@ -249,42 +298,56 @@ export default function AdminPlusPage() {
         </div>
       )}
 
+      {/* camera scan overlay */}
+      {camOpen && (
+        <CameraScanOverlay
+          title="Scan produce sticker"
+          hint="Point the camera at the PLU sticker or barcode."
+          onScan={handleScan}
+          onClose={() => setCamOpen(false)}
+        />
+      )}
+
       {editing && (
         <div className="overlay" onClick={() => setEditing(null)}>
-          <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
+          <div className="overlayCardScrollable" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div className="title">Edit PLU</div>
               <button className="xBtn" onClick={() => setEditing(null)}>×</button>
             </div>
             <div className="divider" />
-            <div className="grid" style={{ gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
-              <div style={{ gridColumn: "span 12" }}>
-                <div className="muted" style={{ fontSize: 13 }}>Name</div>
+            <div className="formGrid">
+              <div className="span12">
+                <label className="fieldLabel">Name</label>
                 <input className="input" value={eName} onChange={(e) => setEName(e.target.value)} />
               </div>
-              <div style={{ gridColumn: "span 6" }}>
-                <div className="muted" style={{ fontSize: 13 }}>PLU code</div>
+              <div className="span6">
+                <label className="fieldLabel">PLU code</label>
                 <input className="input" value={ePlu} onChange={(e) => setEPlu(e.target.value)} inputMode="numeric" />
               </div>
-              <div style={{ gridColumn: "span 6" }}>
-                <div className="muted" style={{ fontSize: 13 }}>Price (optional)</div>
+              <div className="span6">
+                <label className="fieldLabel">Price (optional)</label>
                 <input className="input" value={ePrice} onChange={(e) => setEPrice(e.target.value)} inputMode="decimal" />
               </div>
-              <div style={{ gridColumn: "span 6" }}>
-                <div className="muted" style={{ fontSize: 13 }}>Department</div>
+              <div className="span6">
+                <label className="fieldLabel">Department</label>
                 <input className="input" value={eDept} onChange={(e) => setEDept(e.target.value)} />
               </div>
-              <div style={{ gridColumn: "span 6" }}>
-                <div className="muted" style={{ fontSize: 13 }}>Sort order</div>
+              <div className="span6">
+                <label className="fieldLabel">Sort order</label>
                 <input className="input" value={eSort} onChange={(e) => setESort(e.target.value)} inputMode="numeric" />
               </div>
-              <div style={{ gridColumn: "span 12" }}>
-                <label className="checkRow" style={{ marginTop: 0 }}>
-                  <input type="checkbox" checked={eActive} onChange={(e) => setEActive(e.target.checked)} />
+              <div className="span12">
+                <label style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
+                  <span className="switch">
+                    <input type="checkbox" checked={eActive} onChange={(e) => setEActive(e.target.checked)} />
+                    <span className="switchTrack" />
+                    <span className="switchThumb" />
+                  </span>
                   <span style={{ fontWeight: 800, color: "var(--ink)" }}>Active</span>
                 </label>
               </div>
-              <div style={{ gridColumn: "span 12", display: "flex", gap: 10 }}>
+              <div className="span12" style={{ display: "flex", gap: 10 }}>
                 <button className="btn btnPrimary" onClick={saveEdit} style={{ flex: 1 }}>Save Changes</button>
                 <button className="btn btnSoft" onClick={() => setEditing(null)} style={{ flex: 1 }}>Cancel</button>
               </div>

@@ -235,165 +235,140 @@ export default function AdminDealsPage() {
   }, [deals, filter]);
 
   return (
-    <div className="card" style={{ padding: 16, borderRadius: 18 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 10,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
+    <div className="card">
+      <div className="pageHead">
         <div>
-          <div style={{ fontWeight: 950, fontSize: 22 }}>Deals Manager</div>
+          <div className="title">Deals Manager</div>
           <div className="muted" style={{ marginTop: 6 }}>
-            Set departments + featured order + dates to control the home page.
+            Departments, featured order, and dates control the home page.
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className="pageHeadActions">
           <button className="btn" onClick={loadDeals}>
             Refresh
           </button>
         </div>
       </div>
 
-      <div className="hr" />
+      <div className="divider" />
 
       {/* Add Deal */}
-      <div className="card" style={{ padding: 14, borderRadius: 16 }}>
-        <div style={{ fontWeight: 950, fontSize: 18 }}>Add Deal</div>
-        <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-          Leave dates blank to show always. Or set a start/end range.
+      <div className="listRow" style={{ boxShadow: "none" }}>
+        <div className="subtitle">Add Deal</div>
+        <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+          Leave dates blank to show always, or set a start/end range.
         </div>
 
-        <div className="hr" />
+        <div className="divider" />
 
-        <div className="grid" style={{ gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
-          <div style={{ gridColumn: "span 12" }}>
-            <label>
-              Deal Name
-              <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        <div className="formGrid">
+          <div className="span12">
+            <label className="fieldLabel">Deal name</label>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+
+          <div className="span6">
+            <label className="fieldLabel">Price</label>
+            <input
+              className="input"
+              style={{ fontSize: 18, fontWeight: 800 }}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              inputMode="decimal"
+              placeholder="4.99"
+            />
+          </div>
+
+          <div className="span6">
+            <label className="fieldLabel">UPC (11 or 12 digits)</label>
+            <input className="input" value={upc} onChange={(e) => setUpc(e.target.value)} inputMode="numeric" />
+          </div>
+
+          <div className="span12">
+            <label className="fieldLabel">Description</label>
+            <textarea
+              className="input"
+              style={{ minHeight: 90, fontSize: 16, resize: "vertical" }}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+
+          <div className="span6">
+            <label className="fieldLabel">Department</label>
+            <select className="input" value={department} onChange={(e) => setDepartment(e.target.value)}>
+              {DEPTS.map((x) => (
+                <option key={x.value} value={x.value}>
+                  {x.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="span6">
+            <label className="fieldLabel">Featured order (0 first)</label>
+            <input
+              className="input"
+              value={featuredOrder}
+              onChange={(e) => setFeaturedOrder(e.target.value)}
+              inputMode="numeric"
+            />
+          </div>
+
+          <div className="span6">
+            <label className="fieldLabel">Start date (optional)</label>
+            <input className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </div>
+
+          <div className="span6">
+            <label className="fieldLabel">End date (optional)</label>
+            <input className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+
+          <div className="span12">
+            <label style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <span className="switch">
+                <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />
+                <span className="switchTrack" />
+                <span className="switchThumb" />
+              </span>
+              <span style={{ fontWeight: 800, color: "var(--ink)" }}>Featured (Top Deal)</span>
             </label>
           </div>
 
-          <div style={{ gridColumn: "span 6" }}>
-            <label style={{ fontWeight: 900 }}>
-              Price
-              <input
-                className="input"
-                style={{ fontSize: 18, fontWeight: 900 }}
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                inputMode="decimal"
-              />
-            </label>
-          </div>
-
-          <div style={{ gridColumn: "span 6" }}>
-            <label>
-              UPC (11 or 12 digits)
-              <input className="input" value={upc} onChange={(e) => setUpc(e.target.value)} />
-            </label>
-          </div>
-
-          <div style={{ gridColumn: "span 12" }}>
-            <label style={{ fontWeight: 900 }}>
-              Description
-              <textarea
-                className="input"
-                style={{ minHeight: 90, fontSize: 16 }}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </label>
-          </div>
-
-          <div style={{ gridColumn: "span 6" }}>
-            <label>
-              Department
-              <select className="input" value={department} onChange={(e) => setDepartment(e.target.value)}>
-                {DEPTS.map((x) => (
-                  <option key={x.value} value={x.value}>
-                    {x.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div style={{ gridColumn: "span 6" }}>
-            <label>
-              Featured Order (0 first)
-              <input
-                className="input"
-                value={featuredOrder}
-                onChange={(e) => setFeaturedOrder(e.target.value)}
-                inputMode="numeric"
-              />
-            </label>
-          </div>
-
-          <div style={{ gridColumn: "span 6" }}>
-            <label>
-              Start Date (optional)
-              <input className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            </label>
-          </div>
-
-          <div style={{ gridColumn: "span 6" }}>
-            <label>
-              End Date (optional)
-              <input className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            </label>
-          </div>
-
-          <div style={{ gridColumn: "span 12", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <label style={{ display: "flex", gap: 10, alignItems: "center", fontWeight: 900 }}>
-              <input
-                type="checkbox"
-                checked={featured}
-                onChange={(e) => setFeatured(e.target.checked)}
-                style={{ transform: "scale(1.25)" }}
-              />
-              Featured (Top Deal)
-            </label>
-          </div>
-
-          <div style={{ gridColumn: "span 12" }}>
-            <label>
-              Image URL (optional)
-              <input
-                className="input"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://..."
-              />
-            </label>
-            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              Or upload:
-            </div>
+          <div className="span12">
+            <label className="fieldLabel">Image URL (optional)</label>
+            <input
+              className="input"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://..."
+            />
+            <div className="fieldHelp">Or upload a file:</div>
             <input className="input" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
           </div>
 
-          <div style={{ gridColumn: "span 12" }}>
+          <div className="span12">
             <button className="btn btnPrimary" onClick={addDeal} style={{ width: "100%", padding: "14px 16px", fontSize: 16 }}>
               Save Deal
             </button>
           </div>
         </div>
 
-        {status && <p style={{ marginTop: 10 }}>{status}</p>}
+        {status && <div className="statusMsg">{status}</div>}
       </div>
 
-      <div className="hr" />
+      <div className="divider" />
 
       {/* Filter */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
-        <div className="muted" style={{ fontSize: 13 }}>
-          Show:
-        </div>
-        <select className="input" style={{ maxWidth: 220 }} value={filter} onChange={(e) => setFilter(e.target.value as any)}>
+        <div className="fieldLabel" style={{ marginBottom: 0 }}>Show</div>
+        <select
+          className="input"
+          style={{ maxWidth: 220, marginTop: 0 }}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as any)}
+        >
           <option value="featured">Top Deals (featured)</option>
           <option value="active">Active only</option>
           <option value="">All</option>
@@ -403,9 +378,7 @@ export default function AdminDealsPage() {
           <option value="new">New Items</option>
           <option value="weekly">Weekly</option>
         </select>
-        <div className="muted" style={{ fontSize: 13 }}>
-          Count: <b>{shown.length}</b>
-        </div>
+        <span className="chip">{shown.length} shown</span>
       </div>
 
       {/* Deals list */}
@@ -414,7 +387,7 @@ export default function AdminDealsPage() {
       ) : (
         <div style={{ display: "grid", gap: 12 }}>
           {shown.map((d) => (
-            <div key={d.id} className="card" style={{ padding: 14, borderRadius: 16 }}>
+            <div key={d.id} className="listRow">
               <div style={{ display: "flex", gap: 12, alignItems: "stretch", flexWrap: "wrap" }}>
                 <div
                   style={{
@@ -466,9 +439,7 @@ export default function AdminDealsPage() {
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 10, marginTop: 10 }}>
                     <div style={{ gridColumn: "span 6" }}>
-                      <label className="muted" style={{ fontSize: 12 }}>
-                        Department
-                      </label>
+                      <label className="fieldLabel">Department</label>
                       <select className="input" value={d.department || ""} onChange={(e) => updateDeal(d.id, { department: normDept(e.target.value) || null })}>
                         {DEPTS.map((x) => (
                           <option key={x.value} value={x.value}>
@@ -479,9 +450,7 @@ export default function AdminDealsPage() {
                     </div>
 
                     <div style={{ gridColumn: "span 6" }}>
-                      <label className="muted" style={{ fontSize: 12 }}>
-                        UPC
-                      </label>
+                      <label className="fieldLabel">UPC</label>
                       <input
                         className="input"
                         value={d.upc}
@@ -500,9 +469,7 @@ export default function AdminDealsPage() {
                     </div>
 
                     <div style={{ gridColumn: "span 12" }}>
-                      <label className="muted" style={{ fontSize: 12 }}>
-                        Description
-                      </label>
+                      <label className="fieldLabel">Description</label>
                       <textarea
                         className="input"
                         style={{ minHeight: 70 }}
@@ -515,23 +482,17 @@ export default function AdminDealsPage() {
                     </div>
 
                     <div style={{ gridColumn: "span 6" }}>
-                      <label className="muted" style={{ fontSize: 12 }}>
-                        Start Date
-                      </label>
+                      <label className="fieldLabel">Start Date</label>
                       <input className="input" type="date" value={d.start_date || ""} onChange={(e) => updateDeal(d.id, { start_date: e.target.value || null })} />
                     </div>
 
                     <div style={{ gridColumn: "span 6" }}>
-                      <label className="muted" style={{ fontSize: 12 }}>
-                        End Date
-                      </label>
+                      <label className="fieldLabel">End Date</label>
                       <input className="input" type="date" value={d.end_date || ""} onChange={(e) => updateDeal(d.id, { end_date: e.target.value || null })} />
                     </div>
 
                     <div style={{ gridColumn: "span 12" }}>
-                      <label className="muted" style={{ fontSize: 12 }}>
-                        Image URL
-                      </label>
+                      <label className="fieldLabel">Image URL</label>
                       <input
                         className="input"
                         value={d.image_url || ""}
@@ -543,21 +504,22 @@ export default function AdminDealsPage() {
                       />
                     </div>
 
-                    <div style={{ gridColumn: "span 12", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 900 }}>
-                        <input
-                          type="checkbox"
-                          checked={!!d.featured}
-                          onChange={(e) => updateDeal(d.id, { featured: e.target.checked })}
-                          style={{ transform: "scale(1.25)" }}
-                        />
-                        Featured (Top Deals)
+                    <div style={{ gridColumn: "span 12", display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span className="switch">
+                          <input
+                            type="checkbox"
+                            checked={!!d.featured}
+                            onChange={(e) => updateDeal(d.id, { featured: e.target.checked })}
+                          />
+                          <span className="switchTrack" />
+                          <span className="switchThumb" />
+                        </span>
+                        <span style={{ fontWeight: 800, color: "var(--ink)" }}>Featured (Top Deals)</span>
                       </label>
 
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span className="muted" style={{ fontSize: 12 }}>
-                          Order
-                        </span>
+                        <span className="fieldLabel" style={{ marginBottom: 0 }}>Order</span>
                         <input
                           className="input"
                           style={{ width: 90 }}
@@ -575,7 +537,7 @@ export default function AdminDealsPage() {
                       <button className={"btn " + (d.active ? "btnPrimary" : "")} onClick={() => updateDeal(d.id, { active: !d.active })} style={{ flex: 1 }}>
                         {d.active ? "Active" : "Inactive"}
                       </button>
-                      <button className="btn" onClick={() => removeDeal(d.id)} style={{ flex: 1 }}>
+                      <button className="btn btnDanger" onClick={() => removeDeal(d.id)} style={{ flex: 1 }}>
                         Delete
                       </button>
                     </div>

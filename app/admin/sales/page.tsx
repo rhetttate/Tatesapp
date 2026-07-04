@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import Barcode from "react-barcode";
+import { useWedgeScanner, CameraScanOverlay } from "../../components/scanner";
 
 type SaleItem = {
   id: string;
@@ -53,9 +54,13 @@ export default function AdminSalesPage() {
   const [upc, setUpc] = useState("");
   const [price, setPrice] = useState("");
   const [sortOrder, setSortOrder] = useState("0");
+  const nameRef = useRef<HTMLInputElement | null>(null);
 
   // search
   const [query, setQuery] = useState("");
+
+  // camera scanner
+  const [camOpen, setCamOpen] = useState(false);
 
   // edit modal/state
   const [editing, setEditing] = useState<SaleItem | null>(null);
@@ -111,6 +116,30 @@ export default function AdminSalesPage() {
       return (b.created_at || "").localeCompare(a.created_at || "");
     });
   }, [items, query]);
+
+  /* ---------- scanning (USB wedge + camera) ---------- */
+  function handleScan(raw: string) {
+    const code = digitsOnly(raw);
+    if (code.length < 4) return;
+    setCamOpen(false);
+
+    // scanned an existing item -> open it for editing
+    const match = items.find(
+      (it) => digitsOnly(it.upc) === code || digitsOnly(it.upc).slice(0, 11) === code.slice(0, 11)
+    );
+    if (match) {
+      openEdit(match);
+      setStatus(`Scanned: found "${match.name}".`);
+      return;
+    }
+
+    // new UPC -> pre-fill the add form
+    setUpc(code);
+    setStatus(`Scanned ${code} — new item, enter a name.`);
+    nameRef.current?.focus();
+  }
+
+  useWedgeScanner(handleScan, { enabled: !editing && !camOpen, minLength: 6 });
 
   async function add() {
     setStatus("");
@@ -212,122 +241,93 @@ export default function AdminSalesPage() {
   }, [eUpc]);
 
   return (
-    <div className="card" style={{ padding: 16, borderRadius: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+    <div className="card">
+      <div className="pageHead">
         <div>
-          <div style={{ fontWeight: 950, fontSize: 22 }}>Sales Items</div>
+          <div className="title">Sale Items</div>
           <div className="muted" style={{ marginTop: 6 }}>
-            Active items show first (ordered by Sort Order). Search filters instantly.
+            Active items show first, ordered by sort order. Scan a barcode any time to look up or add.
           </div>
         </div>
-        <button className="btn" onClick={load}>
-          Refresh
-        </button>
+        <div className="pageHeadActions">
+          <button className="btn btnSoft" onClick={() => setCamOpen(true)}>📷 Scan</button>
+          <button className="btn" onClick={load}>Refresh</button>
+        </div>
       </div>
 
-      <div className="hr" />
-
-      {/* search */}
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ fontWeight: 900 }}>
-          Search
-          <input
-            className="input"
-            placeholder="Search by name, UPC, price, order…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{ marginTop: 6 }}
-          />
-        </label>
-      </div>
+      <div className="divider" />
 
       {/* add form */}
-      <div className="grid" style={{ gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
-        <div style={{ gridColumn: "span 12" }}>
-          <label>
-            Item Name
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
+      <div className="formGrid">
+        <div className="span12">
+          <label className="fieldLabel">Item name</label>
+          <input ref={nameRef} className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="2% Milk 1gal" />
         </div>
 
-        <div style={{ gridColumn: "span 6" }}>
-          <label>
-            UPC (11 or 12 digits)
-            <input className="input" value={upc} onChange={(e) => setUpc(e.target.value)} />
-          </label>
+        <div className="span6">
+          <label className="fieldLabel">UPC (11 or 12 digits)</label>
+          <input className="input" value={upc} onChange={(e) => setUpc(e.target.value)} inputMode="numeric" placeholder="Scan or type" />
+          <div className="fieldHelp">USB scanner works here — it types the code for you.</div>
         </div>
 
-        <div style={{ gridColumn: "span 6" }}>
-          <label style={{ fontSize: 16, fontWeight: 900 }}>
-            Price (optional)
-            <input
-              className="input"
-              style={{ fontSize: 18, fontWeight: 900 }}
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              inputMode="decimal"
-              placeholder="e.g. 2.99"
-            />
-          </label>
+        <div className="span3">
+          <label className="fieldLabel">Price (optional)</label>
+          <input className="input" value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" placeholder="2.99" />
         </div>
 
-        <div style={{ gridColumn: "span 6" }}>
-          <label>
-            Sort Order (1–8 recommended)
-            <input
-              className="input"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-              inputMode="numeric"
-            />
-          </label>
-          <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-            Auto-fills to next slot based on active count.
-          </div>
+        <div className="span3">
+          <label className="fieldLabel">Sort order (1–12)</label>
+          <input className="input" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} inputMode="numeric" />
+          <div className="fieldHelp">Auto-fills to the next open slot.</div>
         </div>
 
-        <div style={{ gridColumn: "span 12" }}>
+        <div className="span12">
           <button className="btn btnPrimary" onClick={add} style={{ width: "100%", padding: "14px 16px", fontSize: 16 }}>
             Add Sale Item
           </button>
         </div>
       </div>
 
-      {status && <p style={{ marginTop: 10 }}>{status}</p>}
+      {status && <div className="statusMsg">{status}</div>}
 
-      <div className="hr" />
-      <div style={{ fontWeight: 950, fontSize: 18, marginBottom: 10 }}>Items</div>
+      <div className="divider" />
+
+      {/* search */}
+      <input
+        className="input"
+        placeholder="🔍 Search by name, UPC, price, order…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        style={{ marginTop: 0, marginBottom: 14 }}
+      />
 
       {loading ? (
-        <div className="muted">Loading...</div>
+        <div className="stack">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton" style={{ height: 108 }} />
+          ))}
+        </div>
       ) : (
         <div className="grid">
           {filtered.map((it) => (
-            <div key={it.id} className="card" style={{ padding: 14, borderRadius: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                <div>
-                  <div style={{ fontWeight: 950, fontSize: 18 }}>{it.name}</div>
-                  <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-                    UPC: {it.upc} • Order: {it.sort_order}
-                  </div>
-                </div>
-                <div style={{ fontWeight: 950, fontSize: 20 }}>
-                  {it.price != null ? "$" + Number(it.price).toFixed(2) : ""}
-                </div>
+            <div key={it.id} className="listRow">
+              <div className="listRowTop">
+                <div className="listRowName">{it.name}</div>
+                <div className="listRowPrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
+              </div>
+              <div className="listRowMeta">
+                <span className={"chip " + (it.active ? "chipOk" : "chipOff")}>
+                  {it.active ? "Active" : "Inactive"}
+                </span>{" "}
+                <span className="mono">UPC {it.upc}</span> • Order {it.sort_order}
               </div>
 
-              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                <button className={"btn " + (it.active ? "btnPrimary" : "")} onClick={() => toggle(it)} style={{ flex: 1 }}>
+              <div className="listRowActions">
+                <button className={"btn " + (it.active ? "btnPrimary" : "")} onClick={() => toggle(it)}>
                   {it.active ? "Active" : "Inactive"}
                 </button>
-
-                <button className="btn" onClick={() => openEdit(it)} style={{ flex: 1 }}>
-                  Edit
-                </button>
-
-                <button className="btn" onClick={() => remove(it)} style={{ flex: 1 }}>
-                  Delete
-                </button>
+                <button className="btn" onClick={() => openEdit(it)}>Edit</button>
+                <button className="btn btnDanger" onClick={() => remove(it)}>Delete</button>
               </div>
             </div>
           ))}
@@ -336,87 +336,65 @@ export default function AdminSalesPage() {
         </div>
       )}
 
+      {/* camera scan overlay */}
+      {camOpen && (
+        <CameraScanOverlay
+          title="Scan item barcode"
+          hint="Point the camera at the UPC on the product."
+          onScan={handleScan}
+          onClose={() => setCamOpen(false)}
+        />
+      )}
+
       {/* edit modal */}
       {editing && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 14,
-            zIndex: 1000,
-          }}
-          onClick={() => setEditing(null)}
-        >
-          <div
-            className="card"
-            style={{ width: "min(760px, 100%)", padding: 16, borderRadius: 18 }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="overlay" onClick={() => setEditing(null)}>
+          <div className="overlayCardScrollable" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-              <div style={{ fontWeight: 950, fontSize: 20 }}>Edit Sale Item</div>
-              <button className="btn" onClick={() => setEditing(null)}>
-                Close
-              </button>
+              <div className="title" style={{ fontSize: 20 }}>Edit Sale Item</div>
+              <button className="xBtn" onClick={() => setEditing(null)}>×</button>
             </div>
 
-            <div className="hr" />
+            <div className="divider" />
 
-            <div className="grid" style={{ gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
-              <div style={{ gridColumn: "span 12" }}>
-                <label>
-                  Name
-                  <input className="input" value={eName} onChange={(e) => setEName(e.target.value)} />
+            <div className="formGrid">
+              <div className="span12">
+                <label className="fieldLabel">Name</label>
+                <input className="input" value={eName} onChange={(e) => setEName(e.target.value)} />
+              </div>
+
+              <div className="span6">
+                <label className="fieldLabel">UPC (11 or 12 digits)</label>
+                <input className="input" value={eUpc} onChange={(e) => setEUpc(e.target.value)} inputMode="numeric" />
+                <div className="fieldHelp">11 digits auto-adds the check digit on save.</div>
+              </div>
+
+              <div className="span6">
+                <label className="fieldLabel">Price (optional)</label>
+                <input className="input" value={ePrice} onChange={(e) => setEPrice(e.target.value)} inputMode="decimal" />
+              </div>
+
+              <div className="span6">
+                <label className="fieldLabel">Sort order</label>
+                <input className="input" value={eSortOrder} onChange={(e) => setESortOrder(e.target.value)} inputMode="numeric" />
+              </div>
+
+              <div className="span6" style={{ display: "flex", alignItems: "flex-end" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 10 }}>
+                  <span className="switch">
+                    <input type="checkbox" checked={eActive} onChange={(e) => setEActive(e.target.checked)} />
+                    <span className="switchTrack" />
+                    <span className="switchThumb" />
+                  </span>
+                  <span style={{ fontWeight: 800, color: "var(--ink)" }}>Active</span>
                 </label>
               </div>
 
-              <div style={{ gridColumn: "span 6" }}>
-                <label>
-                  UPC (11 or 12 digits)
-                  <input className="input" value={eUpc} onChange={(e) => setEUpc(e.target.value)} />
-                </label>
-                <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-                  11 digits will auto-add the check digit when you save.
-                </div>
-              </div>
-
-              <div style={{ gridColumn: "span 6" }}>
-                <label style={{ fontSize: 16, fontWeight: 900 }}>
-                  Price (optional)
-                  <input
-                    className="input"
-                    style={{ fontSize: 18, fontWeight: 900 }}
-                    value={ePrice}
-                    onChange={(e) => setEPrice(e.target.value)}
-                    inputMode="decimal"
-                  />
-                </label>
-              </div>
-
-              <div style={{ gridColumn: "span 6" }}>
-                <label>
-                  Sort Order
-                  <input className="input" value={eSortOrder} onChange={(e) => setESortOrder(e.target.value)} inputMode="numeric" />
-                </label>
-              </div>
-
-              <div style={{ gridColumn: "span 6" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 28 }}>
-                  <input type="checkbox" checked={eActive} onChange={(e) => setEActive(e.target.checked)} />
-                  Active
-                </label>
-              </div>
-
-              <div style={{ gridColumn: "span 12" }}>
-                <div style={{ fontWeight: 900, marginBottom: 8 }}>UPC-A Barcode</div>
+              <div className="span12">
+                <label className="fieldLabel" style={{ marginBottom: 8 }}>UPC-A barcode preview</label>
 
                 {safeUpcForBarcode ? (
-                  <div style={{ background: "#fff", borderRadius: 12, padding: 12, display: "inline-block" }}>
+                  <div style={{ background: "#fff", borderRadius: 12, padding: 12, display: "inline-block", border: "1px solid var(--border)" }}>
                     <Barcode
                       value={safeUpcForBarcode}
                       format="UPC"
@@ -427,11 +405,11 @@ export default function AdminSalesPage() {
                     />
                   </div>
                 ) : (
-                  <div className="muted">Enter a valid 11/12 digit UPC to preview the UPC-A barcode.</div>
+                  <div className="muted">Enter a valid 11/12 digit UPC to preview the barcode.</div>
                 )}
               </div>
 
-              <div style={{ gridColumn: "span 12", display: "flex", gap: 10 }}>
+              <div className="span12" style={{ display: "flex", gap: 10 }}>
                 <button className="btn btnPrimary" onClick={saveEdit} style={{ flex: 1, padding: "14px 16px", fontSize: 16 }}>
                   Save Changes
                 </button>

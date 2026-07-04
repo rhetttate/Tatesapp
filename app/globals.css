@@ -45,6 +45,26 @@
   --ring: 0 0 0 4px rgba(37, 99, 235, 0.15);
 
   --pagePad: 18px;
+
+  /* spacing scale (4/8px grid) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* typography scale */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-base: 15px;
+  --fs-md: 16px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: 28px;
+
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -236,6 +256,144 @@ img{
 
 .checkRow{ display: flex; gap: 10px; margin-top: 14px; align-items: flex-start; }
 .checkRow a{ color: var(--blue2); font-weight: 800; }
+
+/* ================================
+   Forms (12-col grid + labelled fields)
+   ================================ */
+.formGrid{
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--sp-3);
+}
+.span12{ grid-column: span 12; }
+.span6{ grid-column: span 6; }
+.span4{ grid-column: span 4; }
+.span3{ grid-column: span 3; }
+@media (max-width: 640px){
+  .span6, .span4, .span3{ grid-column: span 12; }
+}
+.fieldLabel{
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: .01em;
+}
+.fieldHelp{
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--muted-2);
+}
+.mono{ font-family: var(--mono); }
+
+/* ================================
+   Toggle switch
+   ================================ */
+.switch{
+  position: relative;
+  width: 52px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+.switch input{
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.switchTrack{
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(10, 42, 122, 0.18);
+  transition: background .2s ease;
+}
+.switch input:checked + .switchTrack{
+  background: linear-gradient(180deg, var(--blue), var(--blue2));
+}
+.switch input:focus-visible + .switchTrack{ box-shadow: var(--ring); }
+.switchThumb{
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(10, 42, 122, 0.28);
+  transition: transform .2s cubic-bezier(.22,.61,.36,1);
+  pointer-events: none;
+}
+.switch input:checked ~ .switchThumb{ transform: translateX(22px); }
+
+/* ================================
+   Page headers + setting rows
+   ================================ */
+.pageHead{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.pageHeadActions{ display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+
+.settingRow{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: #fff;
+  transition: border-color .15s ease, box-shadow .18s ease;
+}
+.settingRow:hover{ border-color: var(--border-strong); }
+.settingRowTitle{ font-weight: 900; color: var(--ink); font-size: var(--fs-base); }
+.settingRowDesc{ margin-top: 2px; color: var(--muted); font-weight: 600; font-size: var(--fs-sm); line-height: 1.35; }
+
+.chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--blue-soft2);
+  color: var(--blue2);
+  font-weight: 800;
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.chipOk{ background: rgba(22, 163, 74, 0.12); color: #15803d; }
+.chipOff{ background: rgba(10, 42, 122, 0.08); color: var(--muted); }
+.chipDanger{ background: var(--danger-soft); color: #991b1b; }
+
+/* list rows for admin records */
+.listRow{
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: #fff;
+  padding: var(--sp-4);
+  box-shadow: var(--shadow-sm);
+  transition: transform .15s ease, box-shadow .2s ease;
+}
+.listRow:hover{ box-shadow: var(--shadow); }
+.listRowTop{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+.listRowName{ font-weight: 900; color: var(--ink); font-size: var(--fs-lg); line-height: 1.15; }
+.listRowPrice{ font-weight: 900; color: var(--blue2); font-size: var(--fs-lg); white-space: nowrap; }
+.listRowMeta{ margin-top: var(--sp-1); color: var(--muted); font-weight: 700; font-size: var(--fs-sm); }
+.listRowActions{ display: flex; gap: var(--sp-2); margin-top: var(--sp-3); flex-wrap: wrap; }
+.listRowActions .btn{ flex: 1; padding: 10px 12px; font-size: 14px; }
 
 /* ================================
    Badges / pills

@@ -67,6 +67,12 @@ type SaleItem = {
   sort_order: number;
 };
 
+/* sleep window: 7:30 PM – 6:00 AM local time */
+function inSleepWindow(d = new Date()) {
+  const mins = d.getHours() * 60 + d.getMinutes();
+  return mins >= 19 * 60 + 30 || mins < 6 * 60;
+}
+
 function getRegFromQuery(): string | null {
   if (typeof window === "undefined") return null;
   const p = new URLSearchParams(window.location.search);
@@ -160,6 +166,10 @@ export default function CashierPage() {
   const [saleStatus, setSaleStatus] = useState("");
   const [saleLoading, setSaleLoading] = useState(true);
 
+  // sleep mode (7:30pm–6am): all polling stops; tap wakes for 15 min
+  const [asleep, setAsleep] = useState(false);
+  const wakeUntilRef = useRef(0);
+
   // swipe
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -178,9 +188,17 @@ export default function CashierPage() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 2600);
   }
+  // barcode-on-demand popup (fallback when the POS bridge isn't linked)
+  const [showCode, setShowCode] = useState<{ name: string; code: string } | null>(null);
+
   async function ringItem(name: string, code: string) {
     beep(980, 80);
     vibrate(20);
+    if (getBridgeStatus() !== "connected") {
+      // no bridge — show a scannable barcode instead
+      setShowCode({ name, code });
+      return;
+    }
     const res = await sendToPos(code);
     showToast(res.delivered ? `Sent ${name} to register ✅` : `${name}: ${res.message}`);
   }
@@ -290,12 +308,12 @@ export default function CashierPage() {
 
   /* ---------- swipe ---------- */
   function onTouchStart(e: React.TouchEvent) {
-    if (scanning || padOpen || redeemOpen) return;
+    if (scanning || padOpen || redeemOpen || showCode) return;
     touchStartX.current = e.touches[0]?.clientX ?? null;
     touchStartY.current = e.touches[0]?.clientY ?? null;
   }
   function onTouchEnd(e: React.TouchEvent) {
-    if (scanning || padOpen || redeemOpen) return;
+    if (scanning || padOpen || redeemOpen || showCode) return;
 
     const sx = touchStartX.current;
     const sy = touchStartY.current;
@@ -450,18 +468,21 @@ export default function CashierPage() {
   }
 
   /* ---------- sale items ---------- */
-  async function loadSale() {
-    setSaleLoading(true);
-    setSaleStatus("");
+  // Background refreshes never flash the loading state and never trigger a
+  // re-render unless the data actually changed.
+  async function loadSale(showSpinner = false) {
+    if (showSpinner) setSaleLoading(true);
     try {
       const { data, error } = await supabase
         .from("sale_items")
         .select("id,name,upc,price,active,sort_order")
         .eq("active", true)
         .order("sort_order", { ascending: true })
-        .limit(8); // ✅ always 8 max
+        .limit(12); // barcode-free cards fit 12 on screen
       if (error) throw error;
-      setSale((data as any) || []);
+      setSaleStatus("");
+      const next = ((data as any) || []) as SaleItem[];
+      setSale((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     } catch (e: any) {
       setSaleStatus("Sale load error: " + (e?.message ?? String(e)));
     } finally {
@@ -470,16 +491,37 @@ export default function CashierPage() {
   }
 
   useEffect(() => {
-    loadSale();
-    const t = setInterval(loadSale, 10_000);
-    return () => clearInterval(t);
-  }, []);
+    loadSale(sale.length === 0); // spinner only on the very first load
+    if (asleep) return;
 
-  /* ---------- redeem poll ---------- */
+    // slow background refresh while awake + visible
+    const t = setInterval(() => {
+      if (!document.hidden) loadSale();
+    }, 60_000);
+
+    // refresh right away when the tablet screen comes back
+    const onVis = () => {
+      if (!document.hidden) loadSale();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asleep]);
+
+  /* ---------- redeem poll ----------
+     1s while a customer is connected (redemptions land instantly at the
+     register), relaxed 5s safety net when idle, fully stopped while asleep. */
   useEffect(() => {
-    if (!tabletId) return;
+    if (!tabletId || asleep) return;
+
+    const pollMs = memberId.trim() ? 1000 : 5000;
 
     const t = setInterval(async () => {
+      if (document.hidden) return;
       try {
         const { data, error } = await supabase.rpc("fulfill_latest_redemption_for_tablet", {
           p_tablet_id: tabletId,
@@ -509,10 +551,30 @@ export default function CashierPage() {
           setRedeemMsg("");
         }, 60_000);
       } catch {}
-    }, 1000);
+    }, pollMs);
 
     return () => clearInterval(t);
-  }, [tabletId]);
+  }, [tabletId, asleep, memberId]);
+
+  /* ---------- sleep mode ----------
+     Enters sleep during 7:30pm–6am unless a customer is connected or the
+     screen was tapped awake (15 min grace). Checked every 30s. */
+  useEffect(() => {
+    function evalSleep() {
+      const shouldSleep =
+        inSleepWindow() && !memberId.trim() && Date.now() > wakeUntilRef.current;
+      setAsleep((prev) => (prev === shouldSleep ? prev : shouldSleep));
+    }
+    evalSleep();
+    const t = setInterval(evalSleep, 30_000);
+    return () => clearInterval(t);
+  }, [memberId]);
+
+  function wake() {
+    wakeUntilRef.current = Date.now() + 15 * 60_000;
+    setAsleep(false);
+    loadSale(); // fresh items the moment it wakes
+  }
 
   /* ---------- keypad ---------- */
   function keyPress(k: string) {
@@ -726,18 +788,32 @@ export default function CashierPage() {
           border-radius: 20px;
           border: 1px solid rgba(10,60,160,0.12);
           background: linear-gradient(180deg, #ffffff, #f6faff);
-          padding: 14px;
-          display: grid;
-          gap: 10px;
-          align-content: start;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 8px;
           min-height: 0;
           box-shadow: 0 4px 14px rgba(10,42,122,0.05);
+          transition: transform .12s ease, box-shadow .18s ease;
         }
 
-        .saleName { font-weight: 900; font-size: 18px; color: #0a2a7a; letter-spacing: -0.01em; }
-        .salePrice { font-weight: 900; font-size: 22px; color: #1d4ed8; }
+        .saleName { font-weight: 900; font-size: 24px; color: #0a2a7a; letter-spacing: -0.01em; line-height: 1.12; }
+        .salePrice { font-weight: 950; font-size: 26px; color: #1d4ed8; letter-spacing: -0.02em; }
         .saleCardTap { cursor: pointer; }
         .saleCardTap:active { transform: scale(.98); }
+
+        .sleepOverlay {
+          position: fixed; inset: 0; z-index: 90;
+          background: linear-gradient(180deg, #060b1d, #0a1230 70%, #0d1738);
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 14px;
+          cursor: pointer;
+          animation: kioskFade .6s ease both;
+        }
+        .sleepMoon { font-size: 72px; opacity: .9; }
+        .sleepTitle { color: rgba(255,255,255,0.92); font-size: 28px; font-weight: 900; letter-spacing: -0.01em; }
+        .sleepHint { color: rgba(255,255,255,0.45); font-size: 16px; font-weight: 700; }
 
         .posToast {
           position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
@@ -774,7 +850,6 @@ export default function CashierPage() {
         .pluName2 { font-weight: 950; font-size: 19px; color: #0a2a7a; line-height: 1.1; }
         .pluMeta2 { font-weight: 900; color: #1d4ed8; font-size: 14px; }
         .pluPrice2 { margin-top: auto; font-weight: 950; font-size: 20px; color: #0a2a7a; }
-        .saleUpc { font-weight: 900; color: rgba(10,42,122,0.60); font-size: 12px; }
 
         .keypad {
           margin-top: 12px;
@@ -811,68 +886,59 @@ export default function CashierPage() {
           padding: 10px !important;
           overflow: hidden !important;
         }
+        /* let the grid stretch to fill the screen */
+        .saleMode .paneActive {
+          display: flex;
+          flex-direction: column;
+        }
+        .saleMode .saleTitle { flex: 0 0 auto; margin-bottom: 8px; }
 
-        /* Base: keep your current tile sizing */
-          .saleMode .saleGrid{
-            margin-top: 0 !important;
+        /* Fullscreen sale grid: no barcodes, so tiles are short and
+           up to 12 fit without scrolling */
+        .saleMode .saleGrid{
+          margin-top: 0 !important;
 
-            flex: 1;
-            min-height: 0;
-            padding-bottom: 48px;
+          flex: 1;
+          min-height: 0;
+          padding-bottom: 48px;
 
-            display: grid;
+          display: grid;
 
-            /* keep tiles same sizing */
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            grid-auto-rows: minmax(240px, 1fr);
-            grid-auto-flow: dense;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          grid-auto-rows: minmax(110px, 1fr);
+          grid-auto-flow: dense;
 
-            align-content: stretch;
-            overflow: hidden;
+          align-content: stretch;
+          overflow: hidden;
 
-            /* default gap for 8 items */
-            gap: 12px;
-          }
+          gap: 12px;
+        }
 
-          /* ✅ If fewer than 8, give more breathing room */
-          .saleMode.saleCount1 .saleGrid,
-          .saleMode.saleCount2 .saleGrid,
-          .saleMode.saleCount3 .saleGrid,
-          .saleMode.saleCount4 .saleGrid,
-          .saleMode.saleCount5 .saleGrid,
-          .saleMode.saleCount6 .saleGrid,
-          .saleMode.saleCount7 .saleGrid{
-            gap: 20px;
-          }
-
-          /* Optional: if you want 6 or fewer to be even looser */
-          .saleMode.saleCount1 .saleGrid,
-          .saleMode.saleCount2 .saleGrid,
-          .saleMode.saleCount3 .saleGrid,
-          .saleMode.saleCount4 .saleGrid,
-          .saleMode.saleCount5 .saleGrid,
-          .saleMode.saleCount6 .saleGrid{
-            gap: 24px;
-          }
-
-          /* 8 items = tightest */
-          .saleMode.saleCount8 .saleGrid{
-            gap: 12px;
-          }
+        /* fewer items = more breathing room */
+        .saleMode.saleCount1 .saleGrid,
+        .saleMode.saleCount2 .saleGrid,
+        .saleMode.saleCount3 .saleGrid,
+        .saleMode.saleCount4 .saleGrid,
+        .saleMode.saleCount5 .saleGrid,
+        .saleMode.saleCount6 .saleGrid{
+          gap: 24px;
+        }
+        .saleMode.saleCount7 .saleGrid,
+        .saleMode.saleCount8 .saleGrid{
+          gap: 18px;
+        }
 
         .saleMode .saleCard{
           height: 100%;
           min-height: 0 !important;
-          padding: 12px;
-          grid-template-rows: auto 1fr auto;
+          padding: 14px 16px;
         }
 
-        .saleMode .saleName{ font-size: 20px; }
-        .saleMode .salePrice{ font-size: 26px; }
-        .saleMode .saleUpc{ font-size: 13px; }
+        .saleMode .saleName{ font-size: 26px; }
+        .saleMode .salePrice{ font-size: 30px; }
       `}</style>
 
-      <div className={"kioskWrap " + (saleMode ? "saleMode " : "") + "saleCount" + Math.min(8, sale.length)}>
+      <div className={"kioskWrap " + (saleMode ? "saleMode " : "") + "saleCount" + Math.min(12, sale.length)}>
         {/* TOP BAR (hidden in saleMode by CSS; still rendered okay) */}
         <div className="topBar">
           <div className="brand">
@@ -976,7 +1042,7 @@ export default function CashierPage() {
               </div>
             ) : (
               <div className="saleGrid">
-                {sale.slice(0, 8).map((it) => (
+                {sale.slice(0, 12).map((it) => (
                   <div
                     key={it.id}
                     className="saleCard saleCardTap"
@@ -985,14 +1051,8 @@ export default function CashierPage() {
                     onClick={() => ringItem(it.name, it.upc)}
                     title="Tap to send to register"
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-                      <div className="saleName">{it.name}</div>
-                      <div className="salePrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
-                    </div>
-
-                    <BarcodeCanvas upc={it.upc} tall />
-
-                    <div className="saleUpc">Tap to ring • UPC {digitsOnly(it.upc)}</div>
+                    <div className="saleName">{it.name}</div>
+                    <div className="salePrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
                   </div>
                 ))}
               </div>
@@ -1147,8 +1207,73 @@ export default function CashierPage() {
           </div>
         )}
 
+        {/* ITEM BARCODE POPUP (fallback when POS bridge is not linked) */}
+        {showCode && (
+          <div className="overlay" onClick={() => setShowCode(null)}>
+            <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
+              <div className="title">{showCode.name}</div>
+              <div className="muted" style={{ marginTop: 6 }}>
+                POS bridge not linked — scan this barcode on the register.
+              </div>
+
+              <div style={{ marginTop: 14 }}>
+                {digitsOnly(showCode.code).length >= 11 ? (
+                  <>
+                    <BarcodeCanvas upc={showCode.code} tall />
+                    <div className="muted" style={{ marginTop: 8, fontWeight: 900 }}>
+                      UPC {digitsOnly(showCode.code)}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        fontSize: 64,
+                        fontWeight: 950,
+                        color: "#0a2a7a",
+                        textAlign: "center",
+                        letterSpacing: "0.06em",
+                        padding: "18px 0",
+                      }}
+                    >
+                      {digitsOnly(showCode.code)}
+                    </div>
+                    <div className="muted" style={{ fontWeight: 900, textAlign: "center" }}>
+                      Key this PLU on the register.
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="bigBtnRow" style={{ marginTop: 14 }}>
+                <button className="bigBtn bigBtnPrimary" onClick={() => setShowCode(null)}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* TAP-TO-SEND TOAST */}
         {toast ? <div className="posToast">{toast}</div> : null}
+
+        {/* SLEEP MODE (7:30pm–6am) */}
+        {asleep && (
+          <div
+            className="sleepOverlay"
+            onClick={wake}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              wake();
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="sleepMoon">🌙</div>
+            <div className="sleepTitle">Register is sleeping</div>
+            <div className="sleepHint">Tap anywhere to wake it up</div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -301,87 +301,81 @@ export default function AdminCouponsPage() {
   }
 
   return (
-    <div className="card" style={{ padding: 16, borderRadius: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+    <div className="card">
+      <div className="pageHead">
         <div>
-          <div style={{ fontWeight: 950, fontSize: 22 }}>Coupons</div>
+          <div className="title">Coupons</div>
           <div className="muted" style={{ marginTop: 6 }}>
-            Shows redeems per coupon (Today / This Week / This Month).
+            Redemption counts shown per coupon (today / week / month).
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className="pageHeadActions">
           <button className="btn" onClick={() => { load(); loadLog(); }}>Refresh</button>
-          <button className="btn btnPrimary" onClick={openNew}>New Coupon</button>
+          <button className="btn btnPrimary" onClick={openNew}>+ New Coupon</button>
         </div>
       </div>
 
-      {status ? <div style={{ marginTop: 10, fontWeight: 900 }}>{status}</div> : null}
+      {status ? <div className="statusMsg">{status}</div> : null}
 
-      <div className="hr" />
+      <div className="divider" />
 
       {/* Coupons list */}
-      <div style={{ display: "grid", gap: 10 }}>
+      <div className="stack">
         {rows.map((c) => (
-          <div key={c.id} className="card" style={{ padding: 12, borderRadius: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-              <div style={{ fontWeight: 950, fontSize: 18 }}>{c.name}</div>
-              <div style={{ fontWeight: 950, color: c.active ? "#15803d" : "#b91c1c" }}>
-                {c.active ? "ACTIVE" : "OFF"}
-              </div>
+          <div key={c.id} className="listRow">
+            <div className="listRowTop">
+              <div className="listRowName">{c.name}</div>
+              <span className={"chip " + (c.active ? "chipOk" : "chipOff")}>
+                {c.active ? "Active" : "Off"}
+              </span>
             </div>
 
             <div className="muted" style={{ marginTop: 6 }}>{c.description}</div>
 
-            {/* ✅ NEW: Redemption counts */}
-            <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-              Redeemed:{" "}
-              <b>Today {c.redeemed_today ?? 0}</b> •{" "}
-              <b>Week {c.redeemed_week ?? 0}</b> •{" "}
-              <b>Month {c.redeemed_month ?? 0}</b>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+              <span className="chip">Today {c.redeemed_today ?? 0}</span>
+              <span className="chip">Week {c.redeemed_week ?? 0}</span>
+              <span className="chip">Month {c.redeemed_month ?? 0}</span>
+              <span className="chip chipOff">{c.redeem_type === "daily" ? "Reusable daily" : "One-time use"}</span>
             </div>
 
-            <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-              Type: <b>{c.redeem_type === "daily" ? "Reusable daily" : "One-time use"}</b> • Sort: <b>{c.sort_order}</b>
-            </div>
+            <div className="listRowMeta mono">UPC {c.upc} • Sort {c.sort_order}</div>
 
-            <div className="muted" style={{ marginTop: 6, fontSize: 12, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-              UPC: {c.upc}
-            </div>
-
-            <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+            <div className="listRowActions">
               <button className="btn btnSoft" onClick={() => openEdit(c)}>Edit</button>
               <button className="btn btnSoft" onClick={() => toggleActive(c)}>{c.active ? "Disable" : "Enable"}</button>
-              <button className="btn" onClick={() => remove(c)} style={{ color: "#b91c1c", fontWeight: 950 }}>
-                Delete
-              </button>
+              <button className="btn btnDanger" onClick={() => remove(c)}>Delete</button>
             </div>
           </div>
         ))}
         {rows.length === 0 ? <div className="muted">No coupons yet.</div> : null}
       </div>
 
-      <div className="hr" />
+      <div className="divider" />
 
       {/* Redemption log */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+      <div className="pageHead">
         <div>
-          <div style={{ fontWeight: 950, fontSize: 18 }}>Recent Coupon Redemptions</div>
+          <div className="subtitle">Recent Coupon Redemptions</div>
           <div className="muted" style={{ marginTop: 6 }}>Latest 150 redemptions.</div>
         </div>
         <button className="btn" onClick={loadLog}>Refresh Log</button>
       </div>
 
-      {logStatus ? <div style={{ marginTop: 10, fontWeight: 900 }}>{logStatus}</div> : null}
+      {logStatus ? <div className="statusMsg">{logStatus}</div> : null}
 
-      <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+      <div className="stack" style={{ marginTop: 12 }}>
         {logRows.map((r) => (
-          <div key={r.id} className="card" style={{ padding: 12, borderRadius: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ fontWeight: 950 }}>
-                {r.coupons?.name ?? "Coupon"} • {r.redeem_type === "daily" ? "Daily" : "Once"}
+          <div key={r.id} className="listRow" style={{ padding: 12 }}>
+            <div className="listRowTop">
+              <div style={{ fontWeight: 900, color: "var(--ink)" }}>
+                {r.coupons?.name ?? "Coupon"}{" "}
+                <span className="chip chipOff" style={{ marginLeft: 6 }}>
+                  {r.redeem_type === "daily" ? "Daily" : "Once"}
+                </span>
               </div>
-              <div className="muted" style={{ fontWeight: 900 }}>
+              <div className="muted" style={{ fontWeight: 800, fontSize: 13 }}>
                 {new Date(r.redeemed_at).toLocaleString("en-US", {
                   timeZone: "America/Chicago",
                   dateStyle: "short",
@@ -390,11 +384,8 @@ export default function AdminCouponsPage() {
               </div>
             </div>
 
-            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              Member: <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{r.member_id}</span>
-            </div>
-            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              UPC: <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{r.upc}</span>
+            <div className="listRowMeta mono">
+              Member {r.member_id} • UPC {r.upc}
             </div>
           </div>
         ))}
@@ -404,162 +395,114 @@ export default function AdminCouponsPage() {
       {/* Modal */}
       {open ? (
         <div className="overlay" onClick={() => setOpen(false)}>
-          <div className="overlayCard" onClick={(e) => e.stopPropagation()}>
+          <div className="overlayCardScrollable" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-              <div style={{ fontWeight: 950, fontSize: 18 }}>{editing ? "Edit Coupon" : "New Coupon"}</div>
+              <div className="title" style={{ fontSize: 20 }}>{editing ? "Edit Coupon" : "New Coupon"}</div>
               <button className="xBtn" onClick={() => setOpen(false)} type="button">×</button>
             </div>
 
-            <div className="hr" />
+            <div className="divider" />
 
-            <label className="label">Name</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
-
-            <label className="label" style={{ marginTop: 10 }}>Description</label>
-            <textarea className="input" value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} />
-
-            <label className="label" style={{ marginTop: 10 }}>Photo</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                try {
-                  setStatus("Uploading image...");
-                  const url = await uploadCouponImage(file);
-                  setImageUrl(url);
-                  setStatus("Image uploaded ✅");
-                } catch (err: any) {
-                  setStatus("Upload error: " + (err?.message ?? String(err)));
-                } finally {
-                  e.currentTarget.value = "";
-                }
-              }}
-            />
-
-            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              Or paste an image URL:
-            </div>
-
-            <input
-              className="input"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-            />
-
-            {imageUrl ? (
-              <div style={{ marginTop: 10 }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imageUrl} alt="preview" style={{ width: "100%", borderRadius: 14 }} />
+            <div className="formGrid">
+              <div className="span12">
+                <label className="fieldLabel">Name</label>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
-            ) : null}
 
-            <label className="label" style={{ marginTop: 10 }}>UPC-A</label>
-            <input
-              className="input"
-              value={upc}
-              onChange={(e) => setUpc(normalizeUpcA(e.target.value))}
-              placeholder="Enter 11 digits (we'll add check digit)"
-              inputMode="numeric"
-            />
+              <div className="span12">
+                <label className="fieldLabel">Description</label>
+                <textarea className="input" value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} style={{ resize: "vertical" }} />
+              </div>
 
-            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              Stored UPC (12 digits):{" "}
-              <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                {digitsOnly(upc).slice(0, 12)}
-              </span>
-            </div>
+              <div className="span12">
+                <label className="fieldLabel">Photo</label>
+                <input
+                  className="input"
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      setStatus("Uploading image...");
+                      const url = await uploadCouponImage(file);
+                      setImageUrl(url);
+                      setStatus("Image uploaded ✅");
+                    } catch (err: any) {
+                      setStatus("Upload error: " + (err?.message ?? String(err)));
+                    } finally {
+                      e.currentTarget.value = "";
+                    }
+                  }}
+                />
+                <div className="fieldHelp">Or paste an image URL below.</div>
+                <input
+                  className="input"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://..."
+                />
+                {imageUrl ? (
+                  <div style={{ marginTop: 10 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imageUrl} alt="preview" style={{ width: "100%", borderRadius: 14 }} />
+                  </div>
+                ) : null}
+              </div>
 
-            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              Clean: <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{cleanUpc}</span>
-            </div>
+              <div className="span12">
+                <label className="fieldLabel">UPC-A</label>
+                <input
+                  className="input"
+                  value={upc}
+                  onChange={(e) => setUpc(normalizeUpcA(e.target.value))}
+                  placeholder="Enter 11 digits (we'll add check digit)"
+                  inputMode="numeric"
+                />
+                <div className="fieldHelp mono">Stored UPC: {cleanUpc || "—"}</div>
+              </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
-              <div>
-                <label className="label">Type</label>
+              <div className="span6">
+                <label className="fieldLabel">Type</label>
                 <select className="input" value={redeemType} onChange={(e) => setRedeemType(e.target.value as any)}>
                   <option value="daily">Reusable daily</option>
                   <option value="once">One-time use</option>
                 </select>
               </div>
 
-              <div>
-                <label className="label">Sort Order</label>
+              <div className="span6">
+                <label className="fieldLabel">Sort order</label>
                 <input className="input" value={String(sortOrder)} onChange={(e) => setSortOrder(Number(e.target.value || 0))} inputMode="numeric" />
               </div>
-            </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
-              <div>
-                <label className="label">Starts At (optional)</label>
+              <div className="span6">
+                <label className="fieldLabel">Starts at (optional)</label>
                 <input className="input" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
               </div>
-              <div>
-                <label className="label">Ends At (optional)</label>
+              <div className="span6">
+                <label className="fieldLabel">Ends at (optional)</label>
                 <input className="input" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
               </div>
-            </div>
 
-            <label style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, fontWeight: 900 }}>
-              <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-              Active
-            </label>
+              <div className="span12">
+                <label style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 4 }}>
+                  <span className="switch">
+                    <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+                    <span className="switchTrack" />
+                    <span className="switchThumb" />
+                  </span>
+                  <span style={{ fontWeight: 800, color: "var(--ink)" }}>Active</span>
+                </label>
+              </div>
 
-            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-              <button className="btn btnPrimary" style={{ flex: 1 }} onClick={save}>Save</button>
-              <button className="btn btnSoft" style={{ flex: 1 }} onClick={() => setOpen(false)}>Cancel</button>
+              <div className="span12" style={{ display: "flex", gap: 10 }}>
+                <button className="btn btnPrimary" style={{ flex: 1 }} onClick={save}>Save</button>
+                <button className="btn btnSoft" style={{ flex: 1 }} onClick={() => setOpen(false)}>Cancel</button>
+              </div>
             </div>
           </div>
         </div>
       ) : null}
-
-      <style jsx global>{`
-        .hr { height: 1px; background: rgba(29,78,216,0.12); margin: 14px 0; }
-        .label { font-size: 12px; font-weight: 950; color: rgba(10,42,122,0.65); display: block; }
-        .input {
-          width: 100%; padding: 12px; border-radius: 14px;
-          border: 1px solid #c7d2fe; margin-top: 6px; font-weight: 850;
-          outline: none; box-sizing: border-box;
-        }
-        textarea.input { resize: vertical; }
-        .btn {
-          padding: 12px 14px; border-radius: 16px; border: 0;
-          font-weight: 950; cursor: pointer;
-          background: #e8efff; color: #1d4ed8;
-        }
-        .btnPrimary { background: #1d4ed8; color: #fff; }
-        .btnSoft { background: #e8efff; color: #1d4ed8; }
-        .overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(10, 18, 40, 0.45);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 18px;
-          z-index: 50;
-          overscroll-behavior: contain;
-          touch-action: none;
-        }
-        .overlayCard {
-          width: min(640px, 95vw);
-          background: #fff;
-          border-radius: 22px;
-          padding: 18px;
-          border: 1px solid rgba(29,78,216,0.14);
-          box-shadow: 0 18px 50px rgba(10,42,122,0.18);
-          max-height: calc(100vh - 40px);
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-          touch-action: pan-y;
-        }
-        .xBtn {
-          border: 0; background: transparent; color: rgba(10,42,122,0.55);
-          font-weight: 950; font-size: 18px; cursor: pointer;
-        }
-      `}</style>
     </div>
   );
 }
