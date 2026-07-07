@@ -191,16 +191,42 @@ export default function CashierPage() {
   // barcode-on-demand popup (fallback when the POS bridge isn't linked)
   const [showCode, setShowCode] = useState<{ name: string; code: string } | null>(null);
 
-  async function ringItem(name: string, code: string) {
+  // quantity multiplier for sale items (cycles ×1–×9, resets after use)
+  const [qty, setQty] = useState(1);
+  function bumpQty() {
+    vibrate(10);
+    setQty((q) => (q >= 9 ? 1 : q + 1));
+  }
+
+  const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  async function ringItem(name: string, code: string, count = 1) {
     beep(980, 80);
     vibrate(20);
+    setQty(1);
     if (getBridgeStatus() !== "connected") {
       // no bridge — show a scannable barcode instead
       setShowCode({ name, code });
       return;
     }
-    const res = await sendToPos(code);
-    showToast(res.delivered ? `Sent ${name} to register ✅` : `${name}: ${res.message}`);
+
+    let sent = 0;
+    let lastMsg = "";
+    for (let i = 0; i < count; i++) {
+      if (i > 0) await pause(150); // give the bridge time to type each code
+      const res = await sendToPos(code);
+      if (!res.delivered) {
+        lastMsg = res.message;
+        break;
+      }
+      sent++;
+    }
+
+    if (sent === count) {
+      showToast(`Sent ${name}${count > 1 ? ` ×${count}` : ""} to register ✅`);
+    } else {
+      showToast(`${name}: sent ${sent}/${count} — ${lastMsg}`);
+    }
   }
 
   // PLU lookup
@@ -978,7 +1004,33 @@ export default function CashierPage() {
           display: flex;
           flex-direction: column;
         }
-        .saleMode .saleTitle { flex: 0 0 auto; margin-bottom: 8px; }
+        .saleMode .saleHead { flex: 0 0 auto; margin-bottom: 8px; }
+
+        .saleHead {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .qtyBtn {
+          min-width: 64px;
+          padding: 10px 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(10,60,160,0.18);
+          background: #fff;
+          color: #0a2a7a;
+          font-weight: 950;
+          font-size: 20px;
+          cursor: pointer;
+          transition: transform .1s ease, background .15s ease, color .15s ease, box-shadow .18s ease;
+        }
+        .qtyBtn:active { transform: scale(.94); }
+        .qtyBtnOn {
+          background: linear-gradient(180deg, #2563eb, #1d4ed8);
+          color: #fff;
+          border-color: transparent;
+          box-shadow: 0 6px 16px rgba(29,78,216,0.3);
+        }
 
         /* Fullscreen sale grid: no barcodes, so tiles are short and
            up to 12 fit without scrolling */
@@ -1113,7 +1165,16 @@ export default function CashierPage() {
 
           {/* SALE TAB (fullscreen mode auto via saleMode) */}
           <div className={"pane " + (tab === TAB_SALE ? "paneActive" : "")}>
-            <div className="title saleTitle">Sale Items</div>
+            <div className="saleHead">
+              <div className="title saleTitle">Sale Items</div>
+              <button
+                className={"qtyBtn " + (qty > 1 ? "qtyBtnOn" : "")}
+                onClick={bumpQty}
+                title="Tap to set quantity — next item rings this many times"
+              >
+                ×{qty}
+              </button>
+            </div>
 
             {saleLoading ? (
               <div className="statusBox" style={{ marginTop: 14 }}>
@@ -1135,7 +1196,7 @@ export default function CashierPage() {
                     className="saleCard saleCardTap"
                     role="button"
                     tabIndex={0}
-                    onClick={() => ringItem(it.name, it.upc)}
+                    onClick={() => ringItem(it.name, it.upc, qty)}
                     title="Tap to send to register"
                   >
                     <div className="saleName">{it.name}</div>
