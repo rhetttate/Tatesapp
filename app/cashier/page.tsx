@@ -208,7 +208,15 @@ export default function CashierPage() {
   const [plus, setPlus] = useState<Plu[]>([]);
   const [pluLoading, setPluLoading] = useState(true);
   const [pluQuery, setPluQuery] = useState("");
-  const pluSearchRef = useRef<HTMLInputElement | null>(null);
+
+  // custom on-screen keyboard (the OS keyboard would cover the results)
+  function pluKey(k: string) {
+    vibrate(10);
+    if (k === "back") setPluQuery((q) => q.slice(0, -1));
+    else if (k === "clear") setPluQuery("");
+    else if (k === "space") setPluQuery((q) => (q ? (q + " ").slice(0, 40) : q));
+    else setPluQuery((q) => (q + k).slice(0, 40));
+  }
 
   async function loadPlus() {
     setPluLoading(true);
@@ -261,12 +269,6 @@ export default function CashierPage() {
     showToast(res.message);
   }
 
-  // Focus the PLU search when that tab opens
-  useEffect(() => {
-    if (tab !== TAB_PLU) return;
-    const t = setTimeout(() => pluSearchRef.current?.focus(), 150);
-    return () => clearTimeout(t);
-  }, [tab]);
 
   const saleMode = tab === TAB_SALE;
 
@@ -828,12 +830,97 @@ export default function CashierPage() {
           display: flex; align-items: center; justify-content: space-between;
           gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
         }
-        .pluSearchInput {
-          width: 100%; padding: 16px 18px; font-size: 20px; font-weight: 900;
-          border-radius: 16px; border: 1px solid rgba(10,60,160,0.18);
-          outline: none; background: #fff; color: #0a2a7a; margin-bottom: 14px;
+        /* PLU tab fills the pane so results scroll next to the keyboard */
+        .pluPane.paneActive { display: flex; flex-direction: column; }
+        .pluBar2 { flex: 0 0 auto; }
+        .pluSplit {
+          display: flex;
+          gap: 14px;
+          flex: 1;
+          min-height: 0;
         }
-        .pluSearchInput:focus { border-color: #1d4ed8; box-shadow: 0 0 0 4px rgba(37,99,235,0.15); }
+        .pluLeft {
+          flex: 1;
+          min-width: 0;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+        }
+        .pluResults {
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          padding-bottom: 8px;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .pluSearchBox {
+          flex: 0 0 auto;
+          display: flex; align-items: center; gap: 10px;
+          padding: 14px 16px; min-height: 58px;
+          border-radius: 16px; border: 1px solid rgba(10,60,160,0.18);
+          background: #fff; color: #0a2a7a;
+          font-size: 22px; font-weight: 900;
+          margin-bottom: 12px;
+        }
+        .pluQueryText {
+          min-width: 0; overflow: hidden; white-space: nowrap;
+          letter-spacing: 0.02em;
+        }
+        .pluPlaceholder { color: rgba(10,42,122,0.35); font-weight: 800; }
+        .pluCaret {
+          width: 3px; height: 26px; border-radius: 2px;
+          background: #1d4ed8; flex: 0 0 auto;
+          animation: caretBlink 1.1s steps(1) infinite;
+        }
+        @keyframes caretBlink { 50% { opacity: 0; } }
+        .pluClearBtn {
+          margin-left: auto; flex: 0 0 auto;
+          width: 38px; height: 38px; border-radius: 999px;
+          border: 0; background: rgba(10,42,122,0.08);
+          color: rgba(10,42,122,0.6); font-weight: 900; font-size: 16px;
+          cursor: pointer;
+        }
+        .pluClearBtn:active { transform: scale(.92); }
+
+        /* built-in keyboard (right side in landscape) */
+        .pluKeyboard {
+          flex: 0 0 clamp(320px, 38vw, 470px);
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 12px;
+          border-radius: 18px;
+          background: #eef3fc;
+          border: 1px solid rgba(10,60,160,0.10);
+          align-self: flex-start;
+        }
+        .kbRow { display: flex; gap: 8px; height: 60px; }
+        .kbSpacer { pointer-events: none; }
+        .kbKey {
+          flex: 1;
+          border-radius: 12px;
+          border: 1px solid rgba(10,60,160,0.14);
+          background: #fff;
+          color: #0a2a7a;
+          font-weight: 900;
+          font-size: 21px;
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          padding: 0;
+          touch-action: manipulation;
+          transition: transform .08s ease, background .12s ease;
+        }
+        .kbKey:active { transform: scale(.93); background: #e3ecff; }
+        .kbKeyAlt { background: rgba(29,78,216,0.08); font-size: 17px; }
+
+        /* portrait / narrow fallback: keyboard drops below the results */
+        @media (max-width: 900px) {
+          .pluSplit { flex-direction: column; }
+          .pluKeyboard { flex: 0 0 auto; align-self: stretch; }
+          .kbRow { height: 48px; }
+        }
+
         .pluGrid2 {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -1060,7 +1147,7 @@ export default function CashierPage() {
           </div>
 
           {/* PLU LOOKUP TAB */}
-          <div className={"pane " + (tab === TAB_PLU ? "paneActive" : "")}>
+          <div className={"pane pluPane " + (tab === TAB_PLU ? "paneActive" : "")}>
             <div className="pluBar2">
               <div className="title">PLU Lookup</div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -1081,44 +1168,87 @@ export default function CashierPage() {
               </div>
             </div>
 
-            <input
-              ref={pluSearchRef}
-              className="pluSearchInput"
-              placeholder="🔍  Search item or PLU…"
-              value={pluQuery}
-              onChange={(e) => setPluQuery(e.target.value)}
-              inputMode="search"
-              autoCapitalize="none"
-              autoCorrect="off"
-            />
+            <div className="pluSplit">
+              {/* LEFT: search readout + results (always visible while typing) */}
+              <div className="pluLeft">
+                <div className="pluSearchBox">
+                  <span aria-hidden>🔍</span>
+                  <span className={"pluQueryText " + (pluQuery ? "" : "pluPlaceholder")}>
+                    {pluQuery || "Search item or PLU…"}
+                  </span>
+                  <span className="pluCaret" aria-hidden />
+                  {pluQuery ? (
+                    <button className="pluClearBtn" onClick={() => setPluQuery("")} aria-label="Clear search">
+                      ✕
+                    </button>
+                  ) : null}
+                </div>
 
-            {pluLoading ? (
-              <div className="statusBox">Loading PLUs…</div>
-            ) : pluFiltered.length === 0 ? (
-              <div className="statusBox">
-                {pluQuery ? `No match for “${pluQuery}”.` : "No PLUs yet — add them in Admin → PLUs."}
-              </div>
-            ) : (
-              <div className="pluGrid2">
-                {pluFiltered.map((it) => (
-                  <div
-                    key={it.id}
-                    className="pluTile2"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => ringItem(it.name, it.plu)}
-                    title="Tap to send to register"
-                  >
-                    <div className="pluName2">{it.name}</div>
-                    <div className="pluMeta2">
-                      PLU {it.plu}
-                      {it.department ? ` • ${it.department}` : ""}
+                <div className="pluResults">
+                  {pluLoading ? (
+                    <div className="statusBox">Loading PLUs…</div>
+                  ) : pluFiltered.length === 0 ? (
+                    <div className="statusBox">
+                      {pluQuery ? `No match for “${pluQuery}”.` : "No PLUs yet — add them in Admin → PLUs."}
                     </div>
-                    <div className="pluPrice2">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
+                  ) : (
+                    <div className="pluGrid2">
+                      {pluFiltered.map((it) => (
+                        <div
+                          key={it.id}
+                          className="pluTile2"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => ringItem(it.name, it.plu)}
+                          title="Tap to send to register"
+                        >
+                          <div className="pluName2">{it.name}</div>
+                          <div className="pluMeta2">
+                            PLU {it.plu}
+                            {it.department ? ` • ${it.department}` : ""}
+                          </div>
+                          <div className="pluPrice2">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT: built-in keyboard (never covers the results) */}
+              <div className="pluKeyboard">
+                {[
+                  ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+                  ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+                  ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+                  ["Z", "X", "C", "V", "B", "N", "M"],
+                ].map((row, i) => (
+                  <div className="kbRow" key={i}>
+                    {i === 2 && <span className="kbSpacer" style={{ flex: 0.5 }} />}
+                    {i === 3 && <span className="kbSpacer" style={{ flex: 0.5 }} />}
+                    {row.map((k) => (
+                      <button key={k} className="kbKey" onClick={() => pluKey(k)}>
+                        {k}
+                      </button>
+                    ))}
+                    {i === 2 && <span className="kbSpacer" style={{ flex: 0.5 }} />}
+                    {i === 3 && (
+                      <button className="kbKey kbKeyAlt" style={{ flex: 2 }} onClick={() => pluKey("back")}>
+                        ⌫
+                      </button>
+                    )}
                   </div>
                 ))}
+                <div className="kbRow">
+                  <button className="kbKey kbKeyAlt" style={{ flex: 1 }} onClick={() => pluKey("clear")}>
+                    Clear
+                  </button>
+                  <button className="kbKey" style={{ flex: 3 }} onClick={() => pluKey("space")}>
+                    Space
+                  </button>
+                </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
