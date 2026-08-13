@@ -134,6 +134,13 @@ export default function CashierScoPage() {
   useEffect(() => {
     load();
     setBtReady(isBluetoothSupported());
+    // Service worker makes Chrome offer the full "install app" (WebAPK)
+    // instead of a plain shortcut. Scoped to this screen only.
+    try {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sco-sw.js", { scope: "/cashier/sco" }).catch(() => {});
+      }
+    } catch {}
     setLaneStatus({ 1: getLaneStatus(1), 2: getLaneStatus(2) });
     const offStatus = onLaneStatus((l, s) => setLaneStatus((prev) => ({ ...prev, [l]: s })));
     const offEvent = onLaneEvent((l, e: LaneEvent) => {
