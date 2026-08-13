@@ -244,7 +244,7 @@ export default function CashierScoPage() {
   };
 
   return (
-    <div className="scoRoot">
+    <div className={"scoRoot saleCount" + Math.min(12, sale.length)}>
       <style jsx global>{`
         html, body { height: 100%; background: var(--bg); }
         .scoRoot { height: 100svh; height: 100vh; padding: 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; }
@@ -283,12 +283,25 @@ export default function CashierScoPage() {
 
         .scoMain { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
-        /* screen: sale items */
+        /* screen: sale items — fills the screen and auto-sizes, like the register */
         .saleGrid {
-          flex: 1; overflow-y: auto; display: grid; align-content: start;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; padding-bottom: 6px;
-          -webkit-overflow-scrolling: touch;
+          flex: 1;
+          min-height: 0;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          grid-auto-rows: minmax(110px, 1fr);
+          grid-auto-flow: dense;
+          align-content: stretch;
+          overflow: hidden;
+          gap: 12px;
         }
+        /* fewer items = more breathing room */
+        .saleCount1 .saleGrid, .saleCount2 .saleGrid, .saleCount3 .saleGrid,
+        .saleCount4 .saleGrid, .saleCount5 .saleGrid, .saleCount6 .saleGrid { gap: 24px; }
+        .saleCount7 .saleGrid, .saleCount8 .saleGrid { gap: 18px; }
+        .saleGrid .scoTile { height: 100%; min-height: 0; }
+        .saleGrid .scoTileName { font-size: 26px; }
+        .saleGrid .scoTilePrice { font-size: 30px; color: var(--blue2); }
         .scoTile {
           text-align: left; cursor: pointer;
           background: linear-gradient(180deg, #ffffff, #f6faff);

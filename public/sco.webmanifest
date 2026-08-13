@@ -1,0 +1,16 @@
+{
+  "name": "Tate's Self-Checkout Control",
+  "short_name": "SCO",
+  "description": "Attendant control for the self-checkout lanes",
+  "start_url": "/cashier/sco",
+  "scope": "/cashier/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#eef2f9",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
