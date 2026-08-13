@@ -1113,6 +1113,9 @@ export default function CashierPage() {
             >
               PLU
             </button>
+            <a className="tabBtn" href="/cashier/sco" style={{ textDecoration: "none" }}>
+              SCO
+            </a>
             <button className="tabBtn tabBtnDanger" onClick={disconnect}>
               Disconnect
             </button>
