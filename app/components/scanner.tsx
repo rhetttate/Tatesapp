@@ -124,9 +124,13 @@ export function CameraScanOverlay({
       const qr = qrRef.current;
       qrRef.current = null;
       if (qr) {
-        qr.stop()
-          .then(() => qr.clear())
-          .catch(() => {});
+        // stop() throws synchronously if the camera never started
+        // (e.g. permission denied) — swallow both failure modes.
+        try {
+          qr.stop()
+            .then(() => qr.clear())
+            .catch(() => {});
+        } catch {}
       }
     };
   }, []);

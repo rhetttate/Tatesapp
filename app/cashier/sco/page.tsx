@@ -151,11 +151,33 @@ export default function CashierScoPage() {
       else if (e.kind === "scan-fail") pushFeed(l, `✗ NCR didn't take ${e.code}`, "fail");
       else if (e.kind === "host") pushFeed(l, `NCR → scanner: ${e.hex}`, "host");
       else if (e.kind === "pong") pushFeed(l, `Bridge alive (${e.name})`, "info");
+      else if (e.kind === "raw") pushFeed(l, e.text, "info");
     });
     return () => {
       offStatus();
       offEvent();
       if (bannerTimer.current) clearTimeout(bannerTimer.current);
+    };
+  }, []);
+
+  // Keep the tablet screen awake — if Android sleeps the display, Bluetooth
+  // drops and both lanes unlink. Re-acquired whenever the app comes back to
+  // the foreground (the OS releases wake locks on hide).
+  useEffect(() => {
+    let lock: any = null;
+    async function acquire() {
+      try {
+        if ("wakeLock" in navigator && document.visibilityState === "visible") {
+          lock = await (navigator as any).wakeLock.request("screen");
+        }
+      } catch {}
+    }
+    acquire();
+    const onVis = () => acquire();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      try { lock?.release(); } catch {}
     };
   }, []);
 

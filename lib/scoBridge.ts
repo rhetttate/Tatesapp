@@ -34,11 +34,14 @@ type Slot = {
   device: any;
   rxChar: any;
   onGattDisconnect: (() => void) | null;
+  /** true after an intentional unlink — suppresses auto-relink */
+  manual: boolean;
+  retrying: boolean;
 };
 
 const slots: Record<Lane, Slot> = {
-  1: { device: null, rxChar: null, onGattDisconnect: null },
-  2: { device: null, rxChar: null, onGattDisconnect: null },
+  1: { device: null, rxChar: null, onGattDisconnect: null, manual: false, retrying: false },
+  2: { device: null, rxChar: null, onGattDisconnect: null, manual: false, retrying: false },
 };
 
 const statusListeners = new Set<(lane: Lane, s: LaneStatus) => void>();
@@ -91,6 +94,52 @@ function parseEvent(text: string): LaneEvent {
   return { kind: "raw", text };
 }
 
+/** Open GATT + characteristics on the slot's already-chosen device. */
+async function setupGatt(lane: Lane, slot: Slot) {
+  const server = await slot.device.gatt.connect();
+  const service = await server.getPrimaryService(NUS_SERVICE);
+  slot.rxChar = await service.getCharacteristic(NUS_RX);
+
+  // Event feed (best-effort — an older register-bridge Pico without TX
+  // notifications would still work for sending).
+  try {
+    const txChar = await service.getCharacteristic(NUS_TX);
+    await txChar.startNotifications();
+    txChar.addEventListener("characteristicvaluechanged", (ev: any) => {
+      try {
+        const text = new TextDecoder().decode(ev.target.value);
+        emitEvent(lane, parseEvent(text));
+      } catch {}
+    });
+  } catch {}
+}
+
+/**
+ * Quietly re-establish a dropped connection (Pico power blip, tablet moved
+ * out of range). The browser already knows the device, so no chooser is
+ * needed. Retries with backoff until it works or the user unlinks manually.
+ */
+async function autoRelink(lane: Lane) {
+  const slot = slots[lane];
+  if (slot.retrying || slot.manual || !slot.device) return;
+  slot.retrying = true;
+  try {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      await new Promise((r) => setTimeout(r, Math.min(12000, 1000 * 2 ** attempt)));
+      if (slot.manual || !slot.device) break;
+      if (slot.device?.gatt?.connected && slot.rxChar) break;
+      try {
+        await setupGatt(lane, slot);
+        emitStatus(lane, "connected");
+        emitEvent(lane, { kind: "raw", text: "auto-relinked ✅" });
+        break;
+      } catch {}
+    }
+  } finally {
+    slot.retrying = false;
+  }
+}
+
 /**
  * Pair / connect a lane to its Pico. MUST be called from a user gesture.
  * The device chooser filters on the "TatesSCO" name prefix; pick SCO-1 for
@@ -106,6 +155,7 @@ export async function connectLane(lane: Lane): Promise<{ ok: boolean; message: s
   }
 
   const slot = slots[lane];
+  slot.manual = false;
   try {
     const bt = (navigator as any).bluetooth;
     const device = await bt.requestDevice({
@@ -120,25 +170,11 @@ export async function connectLane(lane: Lane): Promise<{ ok: boolean; message: s
     slot.onGattDisconnect = () => {
       slot.rxChar = null;
       emitStatus(lane, "disconnected");
+      autoRelink(lane);
     };
     device.addEventListener("gattserverdisconnected", slot.onGattDisconnect);
 
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(NUS_SERVICE);
-    slot.rxChar = await service.getCharacteristic(NUS_RX);
-
-    // Event feed (best-effort — an older register-bridge Pico without TX
-    // notifications would still work for sending).
-    try {
-      const txChar = await service.getCharacteristic(NUS_TX);
-      await txChar.startNotifications();
-      txChar.addEventListener("characteristicvaluechanged", (ev: any) => {
-        try {
-          const text = new TextDecoder().decode(ev.target.value);
-          emitEvent(lane, parseEvent(text));
-        } catch {}
-      });
-    } catch {}
+    await setupGatt(lane, slot);
 
     emitStatus(lane, "connected");
     return { ok: true, message: `Lane ${lane} linked to ${device.name || "SCO bridge"} ✅` };
@@ -151,6 +187,7 @@ export async function connectLane(lane: Lane): Promise<{ ok: boolean; message: s
 
 export function disconnectLane(lane: Lane) {
   const slot = slots[lane];
+  slot.manual = true;
   try {
     slot.device?.gatt?.disconnect();
   } catch {}
