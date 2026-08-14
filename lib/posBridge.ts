@@ -24,6 +24,8 @@ type BridgeStatus = "connected" | "disconnected";
 
 let device: any = null;
 let rxChar: any = null;
+let manual = false; // true after an intentional disconnect — suppresses auto-relink
+let retrying = false;
 const listeners = new Set<(s: BridgeStatus) => void>();
 
 function emit(s: BridgeStatus) {
@@ -58,6 +60,39 @@ export function getBridgeDeviceName(): string {
 function onDisconnected() {
   rxChar = null;
   emit("disconnected");
+  autoRelink();
+}
+
+/** Open GATT + the RX characteristic on the already-chosen device. */
+async function setupGatt() {
+  const server = await device.gatt.connect();
+  const service = await server.getPrimaryService(NUS_SERVICE);
+  rxChar = await service.getCharacteristic(NUS_RX);
+}
+
+/**
+ * Quietly re-establish a dropped connection (Pico power blip, tablet moved
+ * out of range). The browser already knows the device, so no chooser is
+ * needed. Retries with backoff until it works or the user disconnects
+ * manually. The status pill flips back to linked via the normal listeners.
+ */
+async function autoRelink() {
+  if (retrying || manual || !device) return;
+  retrying = true;
+  try {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      await new Promise((r) => setTimeout(r, Math.min(12000, 1000 * 2 ** attempt)));
+      if (manual || !device) break;
+      if (device?.gatt?.connected && rxChar) break;
+      try {
+        await setupGatt();
+        emit("connected");
+        break;
+      } catch {}
+    }
+  } finally {
+    retrying = false;
+  }
 }
 
 /**
@@ -73,6 +108,7 @@ export async function connectBluetooth(): Promise<{ ok: boolean; message: string
     };
   }
 
+  manual = false;
   try {
     const bt = (navigator as any).bluetooth;
     device = await bt.requestDevice({
@@ -83,9 +119,7 @@ export async function connectBluetooth(): Promise<{ ok: boolean; message: string
     device.removeEventListener?.("gattserverdisconnected", onDisconnected);
     device.addEventListener("gattserverdisconnected", onDisconnected);
 
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(NUS_SERVICE);
-    rxChar = await service.getCharacteristic(NUS_RX);
+    await setupGatt();
 
     emit("connected");
     return { ok: true, message: `Connected to ${device.name || "POS bridge"} ✅` };
@@ -97,6 +131,7 @@ export async function connectBluetooth(): Promise<{ ok: boolean; message: string
 }
 
 export async function disconnectBluetooth() {
+  manual = true;
   try {
     device?.gatt?.disconnect();
   } catch {}

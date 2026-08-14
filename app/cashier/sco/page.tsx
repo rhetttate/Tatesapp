@@ -100,6 +100,7 @@ export default function CashierScoPage() {
   const [btReady, setBtReady] = useState(false);
 
   const [screen, setScreen] = useState<"sale" | "price">("sale");
+  const [qty, setQty] = useState(1); // ×1–×9, resets after each sale-item send
   const [dept, setDept] = useState<DeptKey>("grocery");
   const [cents, setCents] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
@@ -193,17 +194,33 @@ export default function CashierScoPage() {
   const code11 = deptDef.prefix + cents.padStart(5, "0");
   const codePreview = cents ? code11 + upcaCheckDigit(code11) : "";
 
-  async function ring(code: string, label: string) {
+  async function ring(code: string, label: string, count = 1) {
     beep(980, 90);
     vibrate(25);
-    pushFeed(lane, `→ ${label}`, "sent");
-    const res = await sendToLane(lane, code);
-    if (!res.delivered) {
-      beep(240, 220);
-      pushFeed(lane, res.message, "fail");
+    pushFeed(lane, `→ ${label}${count > 1 ? ` ×${count}` : ""}`, "sent");
+    let sent = 0;
+    let lastMsg = "";
+    for (let i = 0; i < count; i++) {
+      const res = await sendToLane(lane, code);
+      lastMsg = res.message;
+      if (!res.delivered) break;
+      sent++;
+      // Pause between repeats so the NCR doesn't debounce identical scans.
+      if (i < count - 1) await new Promise((r) => setTimeout(r, 250));
     }
-    flashBanner(res.delivered ? `Sent to self-checkout ${lane} ✅` : res.message);
-    return res.delivered;
+    const ok = sent === count;
+    if (!ok) {
+      beep(240, 220);
+      pushFeed(lane, sent > 0 ? `only ${sent}/${count} sent — ${lastMsg}` : lastMsg, "fail");
+    }
+    flashBanner(
+      ok
+        ? `Sent${count > 1 ? " ×" + count : ""} to self-checkout ${lane} ✅`
+        : sent > 0
+          ? `Sent ${sent}/${count} — ${lastMsg}`
+          : lastMsg
+    );
+    return ok;
   }
 
   async function ringPrice() {
@@ -301,6 +318,13 @@ export default function CashierScoPage() {
           touch-action: manipulation;
         }
         .screenTabOn { background: #e3ecff; border-color: rgba(37,99,235,.45); color: var(--blue2); }
+        .qtyBtn {
+          flex: 0 0 auto; min-width: 62px; padding: 11px 14px; border-radius: 999px;
+          border: 1px solid var(--border); background: #fff; color: var(--ink);
+          font-size: 19px; font-weight: 900; cursor: pointer; touch-action: manipulation;
+        }
+        .qtyBtn:active { transform: scale(.94); }
+        .qtyBtnOn { background: var(--blue2); border-color: var(--blue2); color: #fff; }
 
         .scoMain { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
@@ -448,6 +472,14 @@ export default function CashierScoPage() {
             Price entry
           </button>
         </div>
+        {screen === "sale" ? (
+          <button
+            className={"qtyBtn" + (qty > 1 ? " qtyBtnOn" : "")}
+            onClick={() => { vibrate(12); setQty((q) => (q >= 9 ? 1 : q + 1)); }}
+          >
+            ×{qty}
+          </button>
+        ) : null}
         <button className="btn" onClick={load} style={{ padding: "10px 14px" }}>Refresh</button>
       </div>
 
@@ -464,7 +496,15 @@ export default function CashierScoPage() {
               <div className="muted" style={{ padding: 12 }}>No sale items.</div>
             ) : (
               sale.map((it) => (
-                <button key={it.id} className="scoTile" onClick={() => ring(it.upc, it.name)}>
+                <button
+                  key={it.id}
+                  className="scoTile"
+                  onClick={() => {
+                    const n = qty;
+                    setQty(1);
+                    ring(it.upc, it.name, n);
+                  }}
+                >
                   <div className="scoTileName">{it.name}</div>
                   <div className="scoTilePrice">{it.price != null ? "$" + Number(it.price).toFixed(2) : ""}</div>
                 </button>
