@@ -107,6 +107,17 @@ export default function CashierScoPage() {
 
   const [feed, setFeed] = useState<FeedLine[]>([]);
   const [feedOpen, setFeedOpen] = useState(false);
+  // Hidden gesture: triple-tap the bottom-right corner to open the log.
+  const cornerTaps = useRef<number[]>([]);
+  function cornerTap() {
+    const now = Date.now();
+    cornerTaps.current = [...cornerTaps.current.filter((t) => now - t < 1200), now];
+    if (cornerTaps.current.length >= 3) {
+      cornerTaps.current = [];
+      vibrate(20);
+      setFeedOpen(true);
+    }
+  }
   const [banner, setBanner] = useState("");
   const bannerTimer = useRef<any>(null);
   const feedRef = useRef<HTMLDivElement | null>(null);
@@ -248,8 +259,6 @@ export default function CashierScoPage() {
     else if (k === "00") setCents((c) => (c ? (c + "00").slice(0, 5) : c));
     else setCents((c) => (c === "" && k === "0" ? c : (c + k).slice(0, 5)));
   }
-
-  const lastLine = feed.length ? feed[feed.length - 1] : null;
 
   const laneBtn = (l: Lane) => {
     const linked = laneStatus[l] === "connected";
@@ -412,15 +421,11 @@ export default function CashierScoPage() {
         .priceSend:disabled { opacity: .4; }
         .priceSend:active { transform: scale(.98); }
 
-        /* bottom activity strip + expandable feed */
-        .feedStrip {
-          flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
-          background: #0f172a; border-radius: 14px; padding: 9px 14px; cursor: pointer;
-          font-family: var(--mono, monospace); font-size: 13px; color: #cbd5e1;
-          white-space: nowrap; overflow: hidden;
+        /* hidden log trigger + expandable feed */
+        .logCorner {
+          position: fixed; right: 0; bottom: 0; width: 48px; height: 48px;
+          z-index: 55; background: transparent;
         }
-        .feedStrip b { color: #7dd3fc; font-weight: 700; }
-        .feedStripHint { margin-left: auto; opacity: .55; font-size: 12px; }
         .feedPanel {
           position: fixed; left: 12px; right: 12px; bottom: 12px; top: 30%;
           background: #0f172a; border-radius: 18px; padding: 14px; z-index: 60;
@@ -559,19 +564,8 @@ export default function CashierScoPage() {
         )}
       </div>
 
-      {/* bottom activity strip */}
-      <div className="feedStrip" onClick={() => setFeedOpen(true)}>
-        {lastLine ? (
-          <span className={
-            lastLine.kind === "ok" ? "feedOk" : lastLine.kind === "fail" ? "feedFail" : lastLine.kind === "host" ? "feedHost" : undefined
-          }>
-            <b>L{lastLine.lane}</b> {lastLine.text}
-          </span>
-        ) : (
-          <span style={{ opacity: 0.6 }}>Activity — sends, confirmations, NCR messages</span>
-        )}
-        <span className="feedStripHint">tap for full log ▴</span>
-      </div>
+      {/* hidden log trigger — triple-tap the bottom-right corner */}
+      <div className="logCorner" onPointerDown={cornerTap} />
 
       {feedOpen ? (
         <div className="feedPanel" onClick={() => setFeedOpen(false)}>
