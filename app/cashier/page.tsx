@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import {
   sendToPos,
@@ -262,8 +262,12 @@ export default function CashierPage() {
     loadPlus();
   }, []);
 
+  // grid filtering lags a frame behind the keystroke so key taps never
+  // wait on re-rendering ~76 tiles (keeps the keyboard instant on tablets)
+  const deferredPluQuery = useDeferredValue(pluQuery);
+
   const pluFiltered = useMemo(() => {
-    const q = pluQuery.trim().toLowerCase();
+    const q = deferredPluQuery.trim().toLowerCase();
     if (!q) return plus;
     return plus
       .map((it) => {
@@ -279,7 +283,7 @@ export default function CashierPage() {
       .filter((x) => x.s >= 0)
       .sort((a, b) => a.s - b.s || a.it.name.localeCompare(b.it.name))
       .map((x) => x.it);
-  }, [plus, pluQuery]);
+  }, [plus, deferredPluQuery]);
 
   // POS bridge (Bluetooth) status
   const [bridgeStatus, setBridgeStatus] = useState<"connected" | "disconnected">("disconnected");
@@ -937,7 +941,7 @@ export default function CashierPage() {
           touch-action: manipulation;
           transition: transform .08s ease, background .12s ease;
         }
-        .kbKey:active { transform: scale(.93); background: #e3ecff; }
+        .kbKey:active { transform: scale(.93); background: #e3ecff; transition: none; }
         .kbKeyAlt { background: rgba(29,78,216,0.08); font-size: 17px; }
 
         /* portrait / narrow fallback: keyboard drops below the results */
@@ -1242,7 +1246,14 @@ export default function CashierPage() {
                   </span>
                   <span className="pluCaret" aria-hidden />
                   {pluQuery ? (
-                    <button className="pluClearBtn" onClick={() => setPluQuery("")} aria-label="Clear search">
+                    <button
+                      className="pluClearBtn"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        setPluQuery("");
+                      }}
+                      aria-label="Clear search"
+                    >
                       ✕
                     </button>
                   ) : null}
@@ -1291,23 +1302,51 @@ export default function CashierPage() {
                     {i === 2 && <span className="kbSpacer" style={{ flex: 0.5 }} />}
                     {i === 3 && <span className="kbSpacer" style={{ flex: 0.5 }} />}
                     {row.map((k) => (
-                      <button key={k} className="kbKey" onClick={() => pluKey(k)}>
+                      <button
+                        key={k}
+                        className="kbKey"
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          pluKey(k);
+                        }}
+                      >
                         {k}
                       </button>
                     ))}
                     {i === 2 && <span className="kbSpacer" style={{ flex: 0.5 }} />}
                     {i === 3 && (
-                      <button className="kbKey kbKeyAlt" style={{ flex: 2 }} onClick={() => pluKey("back")}>
+                      <button
+                        className="kbKey kbKeyAlt"
+                        style={{ flex: 2 }}
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          pluKey("back");
+                        }}
+                      >
                         ⌫
                       </button>
                     )}
                   </div>
                 ))}
                 <div className="kbRow">
-                  <button className="kbKey kbKeyAlt" style={{ flex: 1 }} onClick={() => pluKey("clear")}>
+                  <button
+                    className="kbKey kbKeyAlt"
+                    style={{ flex: 1 }}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      pluKey("clear");
+                    }}
+                  >
                     Clear
                   </button>
-                  <button className="kbKey" style={{ flex: 3 }} onClick={() => pluKey("space")}>
+                  <button
+                    className="kbKey"
+                    style={{ flex: 3 }}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      pluKey("space");
+                    }}
+                  >
                     Space
                   </button>
                 </div>
