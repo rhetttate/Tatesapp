@@ -9,7 +9,9 @@ import {
   getBridgeStatus,
   isBluetoothSupported,
   onBridgeChange,
+  restoreBridge,
 } from "../../lib/posBridge";
+import { useNightlyRefresh } from "../../lib/useNightlyRefresh";
 
 /* ---------- helpers ---------- */
 function digitsOnly(s: string) {
@@ -261,6 +263,11 @@ export default function CashierPage() {
   useEffect(() => {
     loadPlus();
   }, []);
+  // pick up overnight PLU / sale edits from admin without a page reload
+  useNightlyRefresh(() => {
+    loadPlus();
+    loadSale();
+  });
 
   // grid filtering lags a frame behind the keystroke so key taps never
   // wait on re-rendering ~76 tiles (keeps the keyboard instant on tablets)
@@ -292,6 +299,7 @@ export default function CashierPage() {
     setBridgeStatus(getBridgeStatus());
     setBtSupported(isBluetoothSupported());
     const off = onBridgeChange(setBridgeStatus);
+    restoreBridge();
     return off;
   }, []);
   async function connectRegister() {
@@ -1117,9 +1125,6 @@ export default function CashierPage() {
             >
               PLU
             </button>
-            <a className="tabBtn" href="/cashier/sco" style={{ textDecoration: "none" }}>
-              SCO
-            </a>
             <button className="tabBtn tabBtnDanger" onClick={disconnect}>
               Disconnect
             </button>

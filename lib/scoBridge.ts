@@ -13,8 +13,8 @@
 //    feed: scan-ok / scan-fail acknowledgements and "host:<hex>" lines
 //    showing whatever the NCR sends to the emulated scanner.
 //
-// Connections are module singletons — they survive in-app navigation, and are
-// lost on a full page reload (reconnect is one tap per lane).
+// Connections are module singletons — they survive in-app navigation. After a
+// full page reload, restoreLanes() re-links each lane to its Pico on its own.
 // ---------------------------------------------------------------------------
 
 const NUS_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -94,8 +94,38 @@ function parseEvent(text: string): LaneEvent {
   return { kind: "raw", text };
 }
 
+/**
+ * Resolve once the device is heard advertising (or after timeoutMs). After a
+ * page reload Chrome often refuses gatt.connect() on a remembered device until
+ * it has seen an advertisement from it, so we listen for one first.
+ */
+async function waitForAdvertisement(device: any, timeoutMs: number) {
+  if (!device?.watchAdvertisements) return;
+  const ac = new AbortController();
+  try {
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(resolve, timeoutMs);
+      device.addEventListener(
+        "advertisementreceived",
+        () => {
+          clearTimeout(t);
+          resolve();
+        },
+        { once: true }
+      );
+      device.watchAdvertisements({ signal: ac.signal }).catch(() => {
+        clearTimeout(t);
+        resolve();
+      });
+    });
+  } finally {
+    ac.abort();
+  }
+}
+
 /** Open GATT + characteristics on the slot's already-chosen device. */
 async function setupGatt(lane: Lane, slot: Slot) {
+  if (!slot.device.gatt.connected) await waitForAdvertisement(slot.device, 4000);
   const server = await slot.device.gatt.connect();
   const service = await server.getPrimaryService(NUS_SERVICE);
   slot.rxChar = await service.getCharacteristic(NUS_RX);
@@ -114,18 +144,37 @@ async function setupGatt(lane: Lane, slot: Slot) {
   } catch {}
 }
 
+function adoptDevice(lane: Lane, device: any) {
+  const slot = slots[lane];
+  if (slot.onGattDisconnect && slot.device) {
+    slot.device.removeEventListener?.("gattserverdisconnected", slot.onGattDisconnect);
+  }
+  slot.device = device;
+  slot.onGattDisconnect = () => {
+    slot.rxChar = null;
+    emitStatus(lane, "disconnected");
+    autoRelink(lane);
+  };
+  device.addEventListener("gattserverdisconnected", slot.onGattDisconnect);
+  try {
+    localStorage.setItem(`sco_lane_${lane}_device`, device.id);
+  } catch {}
+}
+
 /**
  * Quietly re-establish a dropped connection (Pico power blip, tablet moved
  * out of range). The browser already knows the device, so no chooser is
- * needed. Retries with backoff until it works or the user unlinks manually.
+ * needed. Keeps retrying (backing off to every 12s) until it works or the
+ * user unlinks manually.
  */
-async function autoRelink(lane: Lane) {
+async function autoRelink(lane: Lane, firstDelayMs = 1000) {
   const slot = slots[lane];
   if (slot.retrying || slot.manual || !slot.device) return;
   slot.retrying = true;
   try {
-    for (let attempt = 0; attempt < 40; attempt++) {
-      await new Promise((r) => setTimeout(r, Math.min(12000, 1000 * 2 ** attempt)));
+    for (let attempt = 0; ; attempt++) {
+      const wait = attempt === 0 ? firstDelayMs : Math.min(12000, 1000 * 2 ** attempt);
+      await new Promise((r) => setTimeout(r, wait));
       if (slot.manual || !slot.device) break;
       if (slot.device?.gatt?.connected && slot.rxChar) break;
       try {
@@ -162,17 +211,7 @@ export async function connectLane(lane: Lane): Promise<{ ok: boolean; message: s
       filters: [{ namePrefix: "TatesSCO" }],
       optionalServices: [NUS_SERVICE],
     });
-
-    if (slot.onGattDisconnect && slot.device) {
-      slot.device.removeEventListener?.("gattserverdisconnected", slot.onGattDisconnect);
-    }
-    slot.device = device;
-    slot.onGattDisconnect = () => {
-      slot.rxChar = null;
-      emitStatus(lane, "disconnected");
-      autoRelink(lane);
-    };
-    device.addEventListener("gattserverdisconnected", slot.onGattDisconnect);
+    adoptDevice(lane, device);
 
     await setupGatt(lane, slot);
 
@@ -183,6 +222,50 @@ export async function connectLane(lane: Lane): Promise<{ ok: boolean; message: s
     const msg = e?.name === "NotFoundError" ? "No device selected." : (e?.message ?? String(e));
     return { ok: false, message: `Lane ${lane} connect failed: ` + msg };
   }
+}
+
+let restoreStarted = false;
+
+/**
+ * Re-link both lanes to the Picos this tablet paired with before, after a page
+ * reload or app relaunch — no chooser and no tap. Each lane goes back to the
+ * device it was last linked to (falling back to the TatesSCO-1 / -2 name).
+ * Only the first call does anything. Needs Chrome's getDevices() (remembered
+ * Bluetooth permissions); where it's missing this is a no-op.
+ */
+export async function restoreLanes() {
+  if (restoreStarted || !isBluetoothSupported()) return;
+  restoreStarted = true;
+
+  const bt = (navigator as any).bluetooth;
+  if (!bt.getDevices) return;
+
+  // Retry when the tablet wakes up / the app comes back to the front.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    ([1, 2] as Lane[]).forEach((l) => {
+      if (getLaneStatus(l) !== "connected") autoRelink(l, 0);
+    });
+  });
+
+  try {
+    const known: any[] = (await bt.getDevices()).filter((d: any) =>
+      (d.name || "").startsWith("TatesSCO")
+    );
+    for (const lane of [1, 2] as Lane[]) {
+      if (slots[lane].device) continue;
+      let savedId = "";
+      try {
+        savedId = localStorage.getItem(`sco_lane_${lane}_device`) || "";
+      } catch {}
+      const d =
+        known.find((x) => x.id === savedId) ||
+        known.find((x) => (x.name || "").endsWith(`-${lane}`));
+      if (!d) continue;
+      adoptDevice(lane, d);
+      autoRelink(lane, 0);
+    }
+  } catch {}
 }
 
 export function disconnectLane(lane: Lane) {

@@ -13,7 +13,9 @@ import {
   getBridgeDeviceName,
   isBluetoothSupported,
   onBridgeChange,
+  restoreBridge,
 } from "../../../lib/posBridge";
+import { useNightlyRefresh } from "../../../lib/useNightlyRefresh";
 
 type Plu = {
   id: string;
@@ -112,12 +114,16 @@ export default function CashierPluPage() {
     load();
     setBridgeStatus(getBridgeStatus());
     const off = onBridgeChange(setBridgeStatus);
+    restoreBridge();
     const t = setTimeout(() => searchRef.current?.focus(), 250);
     return () => {
       clearTimeout(t);
       off();
     };
   }, []);
+
+  // pick up overnight PLU edits from admin without a page reload
+  useNightlyRefresh(load);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

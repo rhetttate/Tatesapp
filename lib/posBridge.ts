@@ -13,7 +13,8 @@
 //
 // The connection is held in this module (a singleton), so it survives in-app
 // navigation between the register and the PLU page (which use client-side Link
-// navigation). A full page reload drops it and you reconnect with one tap.
+// navigation). After a full page reload, restoreBridge() re-links on its own to
+// the Pico the tablet already paired with (no chooser, no tap).
 // ---------------------------------------------------------------------------
 
 // Nordic UART Service UUIDs (must match the Pico firmware).
@@ -63,25 +64,63 @@ function onDisconnected() {
   autoRelink();
 }
 
+/**
+ * Resolve once the device is heard advertising (or after timeoutMs). After a
+ * page reload Chrome often refuses gatt.connect() on a remembered device until
+ * it has seen an advertisement from it, so we listen for one first.
+ */
+async function waitForAdvertisement(timeoutMs: number) {
+  if (!device?.watchAdvertisements) return;
+  const ac = new AbortController();
+  try {
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(resolve, timeoutMs);
+      device.addEventListener(
+        "advertisementreceived",
+        () => {
+          clearTimeout(t);
+          resolve();
+        },
+        { once: true }
+      );
+      device.watchAdvertisements({ signal: ac.signal }).catch(() => {
+        clearTimeout(t);
+        resolve();
+      });
+    });
+  } finally {
+    ac.abort();
+  }
+}
+
 /** Open GATT + the RX characteristic on the already-chosen device. */
 async function setupGatt() {
+  if (!device.gatt.connected) await waitForAdvertisement(4000);
   const server = await device.gatt.connect();
   const service = await server.getPrimaryService(NUS_SERVICE);
   rxChar = await service.getCharacteristic(NUS_RX);
 }
 
+function adoptDevice(d: any) {
+  device?.removeEventListener?.("gattserverdisconnected", onDisconnected);
+  device = d;
+  device.addEventListener("gattserverdisconnected", onDisconnected);
+}
+
 /**
  * Quietly re-establish a dropped connection (Pico power blip, tablet moved
  * out of range). The browser already knows the device, so no chooser is
- * needed. Retries with backoff until it works or the user disconnects
- * manually. The status pill flips back to linked via the normal listeners.
+ * needed. Keeps retrying (backing off to every 12s) until it works or the
+ * user disconnects manually. The status pill flips back to linked via the
+ * normal listeners.
  */
-async function autoRelink() {
+async function autoRelink(firstDelayMs = 1000) {
   if (retrying || manual || !device) return;
   retrying = true;
   try {
-    for (let attempt = 0; attempt < 40; attempt++) {
-      await new Promise((r) => setTimeout(r, Math.min(12000, 1000 * 2 ** attempt)));
+    for (let attempt = 0; ; attempt++) {
+      const wait = attempt === 0 ? firstDelayMs : Math.min(12000, 1000 * 2 ** attempt);
+      await new Promise((r) => setTimeout(r, wait));
       if (manual || !device) break;
       if (device?.gatt?.connected && rxChar) break;
       try {
@@ -93,6 +132,40 @@ async function autoRelink() {
   } finally {
     retrying = false;
   }
+}
+
+let restoreStarted = false;
+
+/**
+ * Re-link to the Pico this tablet paired with before, after a page reload or
+ * app relaunch — no chooser and no tap. Safe to call from every page that uses
+ * the bridge; only the first call does anything. Needs Chrome's getDevices()
+ * (remembered Bluetooth permissions); where it's missing this is a no-op and
+ * the cashier taps Connect as before.
+ */
+export async function restoreBridge() {
+  if (restoreStarted || device || !isBluetoothSupported()) return;
+  restoreStarted = true;
+
+  const bt = (navigator as any).bluetooth;
+  if (!bt.getDevices) return;
+
+  // Retry when the tablet wakes up / the app comes back to the front.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !isBridgeConnected()) autoRelink(0);
+  });
+
+  try {
+    const known: any[] = await bt.getDevices();
+    // Skip the self-checkout Picos (TatesSCO-*) — those belong to lib/scoBridge.
+    const pico = known.find((d) => {
+      const name: string = d.name || "";
+      return name.startsWith("Tates") && !name.startsWith("TatesSCO");
+    });
+    if (!pico || device) return;
+    adoptDevice(pico);
+    autoRelink(0);
+  } catch {}
 }
 
 /**
@@ -111,13 +184,12 @@ export async function connectBluetooth(): Promise<{ ok: boolean; message: string
   manual = false;
   try {
     const bt = (navigator as any).bluetooth;
-    device = await bt.requestDevice({
-      filters: [{ namePrefix: "Tates" }],
-      optionalServices: [NUS_SERVICE],
-    });
-
-    device.removeEventListener?.("gattserverdisconnected", onDisconnected);
-    device.addEventListener("gattserverdisconnected", onDisconnected);
+    adoptDevice(
+      await bt.requestDevice({
+        filters: [{ namePrefix: "Tates" }],
+        optionalServices: [NUS_SERVICE],
+      })
+    );
 
     await setupGatt();
 

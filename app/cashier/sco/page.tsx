@@ -16,8 +16,10 @@ import {
   isBluetoothSupported,
   onLaneEvent,
   onLaneStatus,
+  restoreLanes,
   sendToLane,
 } from "../../../lib/scoBridge";
+import { useNightlyRefresh } from "../../../lib/useNightlyRefresh";
 
 /* ---------- types ---------- */
 type SaleItem = {
@@ -158,6 +160,7 @@ export default function CashierScoPage() {
     } catch {}
     setLaneStatus({ 1: getLaneStatus(1), 2: getLaneStatus(2) });
     const offStatus = onLaneStatus((l, s) => setLaneStatus((prev) => ({ ...prev, [l]: s })));
+    restoreLanes();
     const offEvent = onLaneEvent((l, e: LaneEvent) => {
       if (e.kind === "scan-ok") pushFeed(l, `✓ Rang ${e.code}`, "ok");
       else if (e.kind === "scan-fail") pushFeed(l, `✗ NCR didn't take ${e.code}`, "fail");
@@ -171,6 +174,9 @@ export default function CashierScoPage() {
       if (bannerTimer.current) clearTimeout(bannerTimer.current);
     };
   }, []);
+
+  // pick up overnight sale-item edits from admin without a page reload
+  useNightlyRefresh(load);
 
   // Keep the tablet screen awake — if Android sleeps the display, Bluetooth
   // drops and both lanes unlink. Re-acquired whenever the app comes back to
