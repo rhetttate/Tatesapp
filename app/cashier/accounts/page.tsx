@@ -48,6 +48,14 @@ export default function AccountsPage() {
   const [setupKey, setSetupKey] = useState("");
   const [lane, setLane] = useState("");
   const searchSeq = useRef(0);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearResetTimer() {
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+    resetTimer.current = null;
+  }
+
+  useEffect(() => clearResetTimer, []);
 
   useEffect(() => {
     const s = getTabletSetup();
@@ -91,12 +99,14 @@ export default function AccountsPage() {
   }
 
   function choose(r: AcctRow) {
+    clearResetTimer();
     setPicked(r);
     setPurchaser("");
     setResult(null);
   }
 
   function reset() {
+    clearResetTimer();
     setPicked(null);
     setPurchaser("");
     setQuery("");
@@ -104,24 +114,34 @@ export default function AccountsPage() {
   }
 
   async function send() {
-    if (!picked || !purchaser.trim() || sending) return;
+    if (!picked || !purchaser.trim() || sending || result?.ok) return;
+    clearResetTimer();
     setSending(true);
     setResult(null);
     try {
-      const tap = await saveTap(kind, picked.id, purchaser.trim());
-      const res = await sendDigitsToPos(tap.number);
-      setResult(
-        res.delivered
-          ? { ok: true, text: `Sent to the register ✅ — ${picked.name}` }
-          : { ok: false, text: "The register link is off. Type this number on the register:", number: tap.number }
-      );
-      if (res.delivered) setTimeout(reset, 2500);
-    } catch (e) {
-      setResult({
-        ok: false,
-        text: `Couldn't log it (${e instanceof Error ? e.message : String(e)}). Type this number on the register and tell a manager:`,
-        number: picked.number,
-      });
+      let tap;
+      try {
+        tap = await saveTap(kind, picked.id, purchaser.trim());
+      } catch (e) {
+        setResult({
+          ok: false,
+          text: `Couldn't log it (${e instanceof Error ? e.message : String(e)}). Type this number on the register and tell a manager:`,
+          number: picked.number,
+        });
+        return;
+      }
+      let delivered = false;
+      try {
+        delivered = (await sendDigitsToPos(tap.number)).delivered;
+      } catch {
+        delivered = false;
+      }
+      if (delivered) {
+        setResult({ ok: true, text: `Sent to the register ✅ — ${picked.name}` });
+        resetTimer.current = setTimeout(reset, 2500);
+      } else {
+        setResult({ ok: false, text: "The register link is off. Type this number on the register:", number: tap.number });
+      }
     } finally {
       setSending(false);
     }
@@ -210,7 +230,7 @@ export default function AccountsPage() {
                 </div>
                 <div className="acRowSub">Who&apos;s purchasing?</div>
                 <div className="acField">{purchaser || <span style={{ color: "#94a3b8" }}>Purchaser&apos;s name</span>}</div>
-                <button className="acSend" disabled={!purchaser.trim() || sending} onClick={send}>
+                <button className="acSend" disabled={!purchaser.trim() || sending || !!result?.ok} onClick={send}>
                   {sending ? "Sending…" : "Send to register"}
                 </button>
                 {result && (
