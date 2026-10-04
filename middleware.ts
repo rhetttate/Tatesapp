@@ -29,6 +29,9 @@ function rewriteTo(prefix: string, req: NextRequest) {
 }
 
 export function middleware(req: NextRequest) {
+  // API routes are shared by every subdomain — never prefix them
+  if (req.nextUrl.pathname.startsWith("/api/")) return NextResponse.next();
+
   const host = getHost(req);
 
   // IMPORTANT: match exact subdomains (not startsWith)

@@ -222,6 +222,23 @@ function onlyDigits(s: string) {
   return (s || "").replace(/\D/g, "");
 }
 
+async function writeDigits(code: string): Promise<PosSendResult> {
+  if (!isBridgeConnected()) {
+    return { ok: true, delivered: false, message: "POS bridge not connected — showing barcode to scan." };
+  }
+  try {
+    const bytes = new TextEncoder().encode(code + "\n");
+    if (rxChar.writeValueWithoutResponse) {
+      await rxChar.writeValueWithoutResponse(bytes);
+    } else {
+      await rxChar.writeValue(bytes);
+    }
+    return { ok: true, delivered: true, message: "Sent to register ✅" };
+  } catch {
+    return { ok: false, delivered: false, message: "Couldn't reach POS bridge — showing barcode instead." };
+  }
+}
+
 /**
  * Send a code to the POS through the bridge. The Pico expects the digits
  * terminated by a newline. Never throws — returns a structured result so the
@@ -237,27 +254,15 @@ export async function sendToPos(rawCode: string): Promise<PosSendResult> {
   // other shorter codes are sent as-is.
   if (code.length === 12) code = code.slice(0, 11);
 
-  if (!isBridgeConnected()) {
-    return {
-      ok: true,
-      delivered: false,
-      message: "POS bridge not connected — showing barcode to scan.",
-    };
-  }
+  return writeDigits(code);
+}
 
-  try {
-    const bytes = new TextEncoder().encode(code + "\n");
-    if (rxChar.writeValueWithoutResponse) {
-      await rxChar.writeValueWithoutResponse(bytes);
-    } else {
-      await rxChar.writeValue(bytes);
-    }
-    return { ok: true, delivered: true, message: "Sent to register ✅" };
-  } catch (e: any) {
-    return {
-      ok: false,
-      delivered: false,
-      message: "Couldn't reach POS bridge — showing barcode instead.",
-    };
-  }
+/**
+ * Type an account or phone number into the register exactly as given (digits +
+ * Enter). Unlike sendToPos, never drops a trailing "check digit".
+ */
+export async function sendDigitsToPos(raw: string): Promise<PosSendResult> {
+  const code = onlyDigits(raw);
+  if (!code) return { ok: false, delivered: false, message: "No number to send." };
+  return writeDigits(code);
 }
