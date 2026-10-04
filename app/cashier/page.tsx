@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import {
@@ -1125,6 +1126,9 @@ export default function CashierPage() {
             >
               PLU
             </button>
+            <Link className="tabBtn" href="/cashier/accounts" style={{ textDecoration: "none" }}>
+              Accounts
+            </Link>
             <button className="tabBtn tabBtnDanger" onClick={disconnect}>
               Disconnect
             </button>
