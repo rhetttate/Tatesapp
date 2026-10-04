@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const { key, kind, id, purchaser } = await req.json();
-    const res = await tpRpc<{ id: number; number: string }>("acct_tap", {
+    const res = await tpRpc<{ id: number; number: string; lane: number }>("acct_tap", {
       p_key: String(key ?? ""),
       p_kind: String(kind ?? ""),
       p_id: String(id ?? ""),

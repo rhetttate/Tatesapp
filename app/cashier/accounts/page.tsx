@@ -48,6 +48,7 @@ export default function AccountsPage() {
   const [setupKey, setSetupKey] = useState("");
   const [lane, setLane] = useState("");
   const searchSeq = useRef(0);
+  const sendingRef = useRef(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function clearResetTimer() {
@@ -82,7 +83,11 @@ export default function AccountsPage() {
           setError("");
         }
       } catch (e) {
-        if (seq === searchSeq.current) setError(e instanceof Error ? e.message : String(e));
+        if (seq === searchSeq.current) {
+          const msg = e instanceof Error ? e.message : String(e);
+          setError(msg);
+          if (/bad tablet key/i.test(msg)) setSetupOpen(true);
+        }
       } finally {
         if (seq === searchSeq.current) setLoading(false);
       }
@@ -114,8 +119,10 @@ export default function AccountsPage() {
   }
 
   async function send() {
+    if (sendingRef.current) return;
     if (!picked || !purchaser.trim() || sending || result?.ok) return;
     clearResetTimer();
+    sendingRef.current = true;
     setSending(true);
     setResult(null);
     try {
@@ -130,6 +137,14 @@ export default function AccountsPage() {
         });
         return;
       }
+      let laneNote = "";
+      const setup = getTabletSetup();
+      if (setup.lane && setup.lane !== String(tap.lane)) {
+        laneNote = ` (logged on lane ${tap.lane} — check Setup)`;
+      } else if (!setup.lane) {
+        saveTabletSetup(String(tap.lane), setup.key);
+        setLane(String(tap.lane));
+      }
       let delivered = false;
       try {
         delivered = (await sendDigitsToPos(tap.number)).delivered;
@@ -137,12 +152,13 @@ export default function AccountsPage() {
         delivered = false;
       }
       if (delivered) {
-        setResult({ ok: true, text: `Sent to the register ✅ — ${picked.name}` });
+        setResult({ ok: true, text: `Sent to the register ✅ — ${picked.name}${laneNote}` });
         resetTimer.current = setTimeout(reset, 2500);
       } else {
-        setResult({ ok: false, text: "The register link is off. Type this number on the register:", number: tap.number });
+        setResult({ ok: false, text: `The register link is off. Type this number on the register:${laneNote}`, number: tap.number });
       }
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
@@ -196,6 +212,8 @@ export default function AccountsPage() {
         )}
       </div>
 
+      {error && <div className="acMsg" style={{ background: "#fee2e2", color: "#991b1b" }}>{error}</div>}
+
       {setupOpen ? (
         <div className="acLeft" style={{ maxWidth: 520 }}>
           <div className="acRowName">Tablet setup</div>
@@ -211,7 +229,6 @@ export default function AccountsPage() {
               <>
                 <div className="acField">{query || <span style={{ color: "#94a3b8" }}>Search {KIND_LABEL[kind].toLowerCase()} name…</span>}</div>
                 <div className="acRowSub">{REGISTER_HINT[kind]}</div>
-                {error && <div className="acMsg" style={{ background: "#fee2e2", color: "#991b1b" }}>{error}</div>}
                 <div className="acList">
                   {rows.map((r) => (
                     <button key={r.id} className="acRow" onClick={() => choose(r)}>

@@ -40,5 +40,5 @@ export async function searchAccounts(kind: AcctKind, q: string): Promise<AcctRow
 
 export async function saveTap(kind: AcctKind, id: string, purchaser: string) {
   const { key } = getTabletSetup();
-  return post<{ id: number; number: string }>("/api/accounts/tap", { key, kind, id, purchaser });
+  return post<{ id: number; number: string; lane: number }>("/api/accounts/tap", { key, kind, id, purchaser });
 }
