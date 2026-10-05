@@ -35,18 +35,15 @@ function prettyNumber(n: string) {
 }
 
 function prettyPhone(d: string) {
-  if (d.length <= 3) return d;
-  if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
-  if (d.length <= 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
-  return d;
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : d;
 }
 
 function phoneError(msg: string) {
-  if (/duplicate key|already on file for another/i.test(msg)) return "That number is already on file for another customer";
+  if (/already on file for another/i.test(msg)) return msg;
   if (/phone already set/i.test(msg)) return "This customer already has a number — refresh the list";
   if (/number already on file for/i.test(msg)) return msg;
   if (/7 to 15 digits/i.test(msg)) return "Enter 7 to 15 digits";
-  return msg;
+  return "Couldn't save the number � try again or ask a manager";
 }
 
 function expiryNote(r: AcctRow): { text: string; red: boolean } | null {
@@ -72,6 +69,7 @@ export default function AccountsPage() {
   const [phone, setPhoneDigits] = useState("");
   const [phoneBusy, setPhoneBusy] = useState(false);
   const [phoneErr, setPhoneErr] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
   const [adding, setAdding] = useState(false);
   const [locked, setLocked] = useState<{ linked: string; name: string; purchaser: string } | null>(null);
   const [sending, setSending] = useState(false);
@@ -84,6 +82,8 @@ export default function AccountsPage() {
   const searchSeq = useRef(0);
   const purchSeq = useRef(0);
   const sendingRef = useRef(false);
+  const phoneSeq = useRef(0);
+  const phoneSavingRef = useRef(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function clearResetTimer() {
@@ -128,7 +128,7 @@ export default function AccountsPage() {
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [kind, query, setupOpen]);
+  }, [kind, query, setupOpen, refreshKey]);
 
   // 8 names on file => further names are one-time only (not saved)
   const full = purchasers.length >= 8;
@@ -161,6 +161,7 @@ export default function AccountsPage() {
     setResult(null);
     setAdding(false);
     setPurchasers([]);
+    phoneSeq.current++;
     setPhoneDigits("");
     setPhoneErr("");
     if (kind === "exempt" && !r.number) {
@@ -192,12 +193,16 @@ export default function AccountsPage() {
   }
 
   async function savePhone() {
-    if (!picked || phoneStep !== "confirm" || phoneBusy) return;
+    if (phoneSavingRef.current) return;
+    if (!picked || phoneStep !== "confirm") return;
+    phoneSavingRef.current = true;
+    const seq = phoneSeq.current;
     setPhoneBusy(true);
     setPhoneErr("");
     try {
       const r = await setPhone(picked.id, phone);
       if (!r.number) throw new Error("No number came back — try again");
+      if (seq !== phoneSeq.current) return;
       const updated = { ...picked, number: r.number };
       setPicked(updated);
       setRows((rs) => rs.map((x) => (x.id === updated.id ? updated : x)));
@@ -205,17 +210,21 @@ export default function AccountsPage() {
       setPhoneDigits("");
       loadPurchasers(updated);
     } catch (e) {
+      if (seq !== phoneSeq.current) return;
       const msg = e instanceof Error ? e.message : String(e);
       if (/bad tablet key/i.test(msg)) setSetupOpen(true);
+      if (/phone already set/i.test(msg)) setRefreshKey((k) => k + 1);
       setPhoneErr(phoneError(msg));
       setPhoneStep("enter");
     } finally {
+      phoneSavingRef.current = false;
       setPhoneBusy(false);
     }
   }
 
   function reset() {
     clearResetTimer();
+    phoneSeq.current++;
     setPhoneStep(null);
     setPhoneDigits("");
     setPhoneErr("");
@@ -387,7 +396,7 @@ export default function AccountsPage() {
         {(["exempt", "charge"] as AcctKind[]).map((k) => (
           <button
             key={k}
-            disabled={!!locked}
+            disabled={!!locked || phoneBusy}
             className={"acBtn " + (kind === k ? "acBtnOn" : "")}
             onClick={() => { setKind(k); reset(); }}
           >

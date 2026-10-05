@@ -17,6 +17,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ id: r?.id ?? String(id ?? ""), number: r?.number ?? "" });
   } catch (e) {
     const status = e instanceof TpError ? e.status : 400;
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status });
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/duplicate key|23505/i.test(msg)) {
+      return NextResponse.json({ error: "That number is already on file for another customer" }, { status: 400 });
+    }
+    return NextResponse.json({ error: msg }, { status });
   }
 }
