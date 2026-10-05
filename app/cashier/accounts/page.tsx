@@ -22,6 +22,7 @@ import {
   restoreBridge,
   sendDigitsToPos,
 } from "../../../lib/posBridge";
+import { useNightlyReload } from "../../../lib/useNightlyReload";
 
 const KIND_LABEL: Record<AcctKind, string> = { exempt: "Tax exempt", charge: "Charge" };
 const REGISTER_HINT: Record<AcctKind, string> = {
@@ -92,6 +93,9 @@ export default function AccountsPage() {
   }
 
   useEffect(() => clearResetTimer, []);
+
+  // pick up new app versions overnight (3:05am) unless a charge is in progress
+  useNightlyReload(() => picked !== null || phoneStep !== null || sending || locked !== null);
 
   useEffect(() => {
     const s = getTabletSetup();

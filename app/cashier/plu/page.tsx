@@ -16,6 +16,7 @@ import {
   restoreBridge,
 } from "../../../lib/posBridge";
 import { useNightlyRefresh } from "../../../lib/useNightlyRefresh";
+import { useNightlyReload } from "../../../lib/useNightlyReload";
 
 type Plu = {
   id: string;
@@ -124,6 +125,8 @@ export default function CashierPluPage() {
 
   // pick up overnight PLU edits from admin without a page reload
   useNightlyRefresh(load);
+  // pick up new app versions overnight (3:05am)
+  useNightlyReload();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

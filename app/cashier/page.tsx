@@ -13,6 +13,7 @@ import {
   restoreBridge,
 } from "../../lib/posBridge";
 import { useNightlyRefresh } from "../../lib/useNightlyRefresh";
+import { useNightlyReload } from "../../lib/useNightlyReload";
 
 /* ---------- helpers ---------- */
 function digitsOnly(s: string) {
@@ -269,6 +270,8 @@ export default function CashierPage() {
     loadPlus();
     loadSale();
   });
+  // pick up new app versions overnight (3:05am) unless someone is mid-sale
+  useNightlyReload(() => memberId !== "" || redeemOpen);
 
   // grid filtering lags a frame behind the keystroke so key taps never
   // wait on re-rendering ~76 tiles (keeps the keyboard instant on tablets)

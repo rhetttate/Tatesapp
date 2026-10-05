@@ -20,6 +20,7 @@ import {
   sendToLane,
 } from "../../../lib/scoBridge";
 import { useNightlyRefresh } from "../../../lib/useNightlyRefresh";
+import { useNightlyReload } from "../../../lib/useNightlyReload";
 
 /* ---------- types ---------- */
 type SaleItem = {
@@ -177,6 +178,8 @@ export default function CashierScoPage() {
 
   // pick up overnight sale-item edits from admin without a page reload
   useNightlyRefresh(load);
+  // pick up new app versions overnight (3:05am) unless a price entry is open
+  useNightlyReload(() => cents !== "" || scanOpen);
 
   // Keep the tablet screen awake — if Android sleeps the display, Bluetooth
   // drops and both lanes unlink. Re-acquired whenever the app comes back to
