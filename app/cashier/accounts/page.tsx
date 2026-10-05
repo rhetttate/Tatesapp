@@ -13,6 +13,7 @@ import {
   saveTabletSetup,
   saveTap,
   searchAccounts,
+  setPhone,
 } from "../../../lib/accountsClient";
 import {
   connectBluetooth,
@@ -31,6 +32,21 @@ const REGISTER_HINT: Record<AcctKind, string> = {
 function prettyNumber(n: string) {
   const d = n.replace(/\D/g, "");
   return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : d;
+}
+
+function prettyPhone(d: string) {
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+  if (d.length <= 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  return d;
+}
+
+function phoneError(msg: string) {
+  if (/duplicate key|already on file for another/i.test(msg)) return "That number is already on file for another customer";
+  if (/phone already set/i.test(msg)) return "This customer already has a number — refresh the list";
+  if (/number already on file for/i.test(msg)) return msg;
+  if (/7 to 15 digits/i.test(msg)) return "Enter 7 to 15 digits";
+  return msg;
 }
 
 function expiryNote(r: AcctRow): { text: string; red: boolean } | null {
@@ -52,6 +68,10 @@ export default function AccountsPage() {
   const [purchaser, setPurchaser] = useState("");
   const [purchasers, setPurchasers] = useState<string[]>([]);
   const [purchasersLoading, setPurchasersLoading] = useState(false);
+  const [phoneStep, setPhoneStep] = useState<"enter" | "confirm" | null>(null);
+  const [phone, setPhoneDigits] = useState("");
+  const [phoneBusy, setPhoneBusy] = useState(false);
+  const [phoneErr, setPhoneErr] = useState("");
   const [adding, setAdding] = useState(false);
   const [locked, setLocked] = useState<{ linked: string; name: string; purchaser: string } | null>(null);
   const [sending, setSending] = useState(false);
@@ -118,6 +138,14 @@ export default function AccountsPage() {
 
   function type(k: string) {
     if (locked) return;
+    if (phoneStep) {
+      if (phoneStep !== "enter" || phoneBusy) return;
+      setPhoneErr("");
+      if (k === "back") setPhoneDigits((v) => v.slice(0, -1));
+      else if (k === "clear") setPhoneDigits("");
+      else if (/^\d$/.test(k)) setPhoneDigits((v) => (v + k).slice(0, 15));
+      return;
+    }
     if (picked && !typingPurchaser) return;
     const set = picked ? setPurchaser : setQuery;
     if (k === "back") set((v) => v.slice(0, -1));
@@ -133,6 +161,19 @@ export default function AccountsPage() {
     setResult(null);
     setAdding(false);
     setPurchasers([]);
+    setPhoneDigits("");
+    setPhoneErr("");
+    if (kind === "exempt" && !r.number) {
+      purchSeq.current++;
+      setPurchasersLoading(false);
+      setPhoneStep("enter");
+      return;
+    }
+    setPhoneStep(null);
+    loadPurchasers(r);
+  }
+
+  function loadPurchasers(r: AcctRow) {
     setPurchasersLoading(true);
     const seq = ++purchSeq.current;
     listPurchasers(kind, r.id)
@@ -150,8 +191,35 @@ export default function AccountsPage() {
       });
   }
 
+  async function savePhone() {
+    if (!picked || phoneStep !== "confirm" || phoneBusy) return;
+    setPhoneBusy(true);
+    setPhoneErr("");
+    try {
+      const r = await setPhone(picked.id, phone);
+      if (!r.number) throw new Error("No number came back — try again");
+      const updated = { ...picked, number: r.number };
+      setPicked(updated);
+      setRows((rs) => rs.map((x) => (x.id === updated.id ? updated : x)));
+      setPhoneStep(null);
+      setPhoneDigits("");
+      loadPurchasers(updated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/bad tablet key/i.test(msg)) setSetupOpen(true);
+      setPhoneErr(phoneError(msg));
+      setPhoneStep("enter");
+    } finally {
+      setPhoneBusy(false);
+    }
+  }
+
   function reset() {
     clearResetTimer();
+    setPhoneStep(null);
+    setPhoneDigits("");
+    setPhoneErr("");
+    setPhoneBusy(false);
     purchSeq.current++;
     setPicked(null);
     setLocked(null);
@@ -165,7 +233,7 @@ export default function AccountsPage() {
 
   async function send() {
     if (sendingRef.current) return;
-    if (!picked || locked || !purchaser.trim() || sending || result?.ok) return;
+    if (!picked || !picked.number || phoneStep || locked || !purchaser.trim() || sending || result?.ok) return;
     clearResetTimer();
     sendingRef.current = true;
     setSending(true);
@@ -183,7 +251,7 @@ export default function AccountsPage() {
         setResult({
           ok: false,
           text: `Couldn't log it (${msg}). Type this number on the register and tell a manager:`,
-          number: picked.number,
+          number: picked.number ?? undefined,
         });
         return;
       }
@@ -360,7 +428,7 @@ export default function AccountsPage() {
                     return (
                       <button key={r.id} className="acRow" onClick={() => choose(r)}>
                         <div className="acRowName">{r.name}</div>
-                        <div className="acRowSub">{kind === "charge" ? `Account #${r.number}` : prettyNumber(r.number)}</div>
+                        <div className="acRowSub">{kind === "charge" ? `Account #${r.number}` : r.number ? prettyNumber(r.number) : "Needs phone number"}</div>
                         {note && <div className={"acTag " + (note.red ? "acTagRed" : "")}>{note.text}</div>}
                         {r.linked && <div className="acRowSub">{kind === "exempt" ? `+ Charge #${r.linked}` : "Tax exempt linked"}</div>}
                       </button>
@@ -383,11 +451,39 @@ export default function AccountsPage() {
                 {resultBox}
                 <button className="acBtn" disabled={sending} onClick={reset}>Paying another way</button>
               </>
+            ) : phoneStep ? (
+              <>
+                <div className="acRow" style={{ cursor: "default" }}>
+                  <div className="acRowName">{picked.name}</div>
+                  <div className="acRowSub">Needs phone number</div>
+                </div>
+                {phoneErr && <div className="acMsg" style={{ background: "#fee2e2", color: "#991b1b" }}>{phoneErr}</div>}
+                {phoneStep === "enter" ? (
+                  <>
+                    <div className="acRowSub">Customer&apos;s phone number</div>
+                    <div className="acField">{phone ? prettyPhone(phone) : <span style={{ color: "#94a3b8" }}>(334) 555-0123</span>}</div>
+                    <button className="acSend" disabled={phone.length < 7} onClick={() => { setPhoneErr(""); setPhoneStep("confirm"); }}>
+                      Next
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="acMsg" style={{ background: "#fef3c7", color: "#92400e" }}>
+                      Save {prettyPhone(phone)} for {picked.name}? This can&apos;t be changed on the tablet.
+                    </div>
+                    <button className="acSend" disabled={phoneBusy} onClick={savePhone}>
+                      {phoneBusy ? "Saving…" : "Save number"}
+                    </button>
+                    <button className="acBtn" disabled={phoneBusy} onClick={() => setPhoneStep("enter")}>Edit number</button>
+                  </>
+                )}
+                <button className="acBtn" disabled={phoneBusy} onClick={reset}>Back to list</button>
+              </>
             ) : (
               <>
                 <div className="acRow" style={{ cursor: "default" }}>
                   <div className="acRowName">{picked.name}</div>
-                  <div className="acRowSub">{kind === "charge" ? `Account #${picked.number}` : prettyNumber(picked.number)}</div>
+                  <div className="acRowSub">{kind === "charge" ? `Account #${picked.number}` : picked.number ? prettyNumber(picked.number) : ""}</div>
                   {picked.linked && <div className="acRowSub">{kind === "exempt" ? `+ Charge #${picked.linked}` : "Tax exempt linked"}</div>}
                 </div>
                 {kind === "exempt" && picked.expiry === "expired" && (

@@ -24,6 +24,9 @@ export async function tpRpc<T>(fn: string, args: Record<string, unknown>): Promi
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const msg = (body && typeof body.message === "string" && body.message) || `Tates Prices error ${res.status}`;
+    if (body?.code === "23505" || /duplicate key/i.test(msg)) {
+      throw new TpError("That number is already on file for another customer", 400);
+    }
     throw new TpError(msg, /bad tablet key/i.test(msg) ? 401 : 400);
   }
   return body as T;

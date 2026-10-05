@@ -5,7 +5,7 @@ export type AcctKind = "exempt" | "charge";
 export type AcctRow = {
   id: string;
   name: string;
-  number: string;
+  number: string | null;
   kind: string;
   expiry: "ok" | "soon" | "expired";
   end_date: string | null;
@@ -60,4 +60,9 @@ export async function saveTap(kind: AcctKind, id: string, purchaser: string, sav
 export async function listPurchasers(kind: AcctKind, id: string): Promise<string[]> {
   const { key } = getTabletSetup();
   return (await post<{ names: string[] }>("/api/accounts/purchasers", { key, kind, id })).names;
+}
+
+export async function setPhone(id: string, phone: string): Promise<{ id: string; number: string }> {
+  const { key } = getTabletSetup();
+  return post<{ id: string; number: string }>("/api/accounts/phone", { key, id, phone });
 }
