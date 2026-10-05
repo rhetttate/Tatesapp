@@ -43,7 +43,7 @@ function phoneError(msg: string) {
   if (/phone already set/i.test(msg)) return "This customer already has a number — refresh the list";
   if (/number already on file for/i.test(msg)) return msg;
   if (/7 to 15 digits/i.test(msg)) return "Enter 7 to 15 digits";
-  return "Couldn't save the number � try again or ask a manager";
+  return "Couldn't save the number — try again or ask a manager";
 }
 
 function expiryNote(r: AcctRow): { text: string; red: boolean } | null {
@@ -228,7 +228,6 @@ export default function AccountsPage() {
     setPhoneStep(null);
     setPhoneDigits("");
     setPhoneErr("");
-    setPhoneBusy(false);
     purchSeq.current++;
     setPicked(null);
     setLocked(null);
