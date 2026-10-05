@@ -55,7 +55,7 @@ export default function AccountsPage() {
   const [adding, setAdding] = useState(false);
   const [locked, setLocked] = useState<{ linked: string; name: string; purchaser: string } | null>(null);
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; text: string; number?: string } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; text: string; number?: string; note?: string } | null>(null);
   const [bridge, setBridge] = useState<"connected" | "disconnected">("disconnected");
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupLane, setSetupLane] = useState("");
@@ -211,7 +211,12 @@ export default function AccountsPage() {
           resetTimer.current = setTimeout(reset, 2500);
         }
       } else {
-        setResult({ ok: false, text: `The register link is off. Type this number on the register:${laneNote}`, number: tap.number });
+        setResult({
+          ok: false,
+          text: `The register link is off. Type this number on the register:${laneNote}`,
+          number: tap.number,
+          note: kind === "exempt" && picked.linked ? `After typing this, use Enter → House Charge and type charge #${picked.linked}` : undefined,
+        });
       }
     } finally {
       sendingRef.current = false;
@@ -267,6 +272,7 @@ export default function AccountsPage() {
     <div className="acMsg" style={{ background: result.ok ? "#dcfce7" : "#fef3c7", color: result.ok ? "#166534" : "#92400e" }}>
       {result.text}
       {result.number && <div className="acBig">{result.number}</div>}
+      {result.note && <div>{result.note}</div>}
     </div>
   );
 
@@ -356,7 +362,7 @@ export default function AccountsPage() {
                         <div className="acRowName">{r.name}</div>
                         <div className="acRowSub">{kind === "charge" ? `Account #${r.number}` : prettyNumber(r.number)}</div>
                         {note && <div className={"acTag " + (note.red ? "acTagRed" : "")}>{note.text}</div>}
-                        {r.linked && <div className="acRowSub">+ Charge #{r.linked}</div>}
+                        {r.linked && <div className="acRowSub">{kind === "exempt" ? `+ Charge #${r.linked}` : "Tax exempt linked"}</div>}
                       </button>
                     );
                   })}
@@ -382,7 +388,7 @@ export default function AccountsPage() {
                 <div className="acRow" style={{ cursor: "default" }}>
                   <div className="acRowName">{picked.name}</div>
                   <div className="acRowSub">{kind === "charge" ? `Account #${picked.number}` : prettyNumber(picked.number)}</div>
-                  {picked.linked && <div className="acRowSub">+ Charge #{picked.linked}</div>}
+                  {picked.linked && <div className="acRowSub">{kind === "exempt" ? `+ Charge #${picked.linked}` : "Tax exempt linked"}</div>}
                 </div>
                 {kind === "exempt" && picked.expiry === "expired" && (
                   <div className="acWarn">EXPIRED — ask for a new form</div>
