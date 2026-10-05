@@ -2,7 +2,15 @@
 // The tablet key (from Tates Prices > Tax exempt > Lane tablets) lives in localStorage.
 
 export type AcctKind = "exempt" | "charge";
-export type AcctRow = { id: string; name: string; number: string; kind: string };
+export type AcctRow = {
+  id: string;
+  name: string;
+  number: string;
+  kind: string;
+  expiry: "ok" | "soon" | "expired";
+  end_date: string | null;
+  linked: string | null;
+};
 
 const KEY = "tates_acct_key";
 const LANE = "tates_acct_lane";
@@ -38,7 +46,18 @@ export async function searchAccounts(kind: AcctKind, q: string): Promise<AcctRow
   return (await post<{ rows: AcctRow[] }>("/api/accounts/search", { key, kind, q })).rows;
 }
 
-export async function saveTap(kind: AcctKind, id: string, purchaser: string) {
+export async function saveTap(kind: AcctKind, id: string, purchaser: string, save = true) {
   const { key } = getTabletSetup();
-  return post<{ id: number; number: string; lane: number }>("/api/accounts/tap", { key, kind, id, purchaser });
+  return post<{ id: number; number: string; lane: number; saved: boolean; full: boolean }>("/api/accounts/tap", {
+    key,
+    kind,
+    id,
+    purchaser,
+    save,
+  });
+}
+
+export async function listPurchasers(kind: AcctKind, id: string): Promise<string[]> {
+  const { key } = getTabletSetup();
+  return (await post<{ names: string[] }>("/api/accounts/purchasers", { key, kind, id })).names;
 }
